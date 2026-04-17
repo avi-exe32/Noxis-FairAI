@@ -1,0 +1,15 @@
+# Ignore sensitive keys and environments
+.env
+venv/
+.vscode/
+
+# Ignore large data and temporary files
+uploads/
+__pycache__/
+*.pyc
+*.csv
+*.pkl
+
+# Project specific
+archive/
+archive.zip

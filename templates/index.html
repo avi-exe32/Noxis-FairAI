@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noxis — AI Bias Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #07070d;
+            --surface: #0f0f1a;
+            --surface2: #16162a;
+            --border: rgba(255,255,255,0.08);
+            --border-bright: rgba(168,85,247,0.4);
+            --text: #f0f0f8;
+            --muted: #6b6b8a;
+            --accent: #a855f7;
+            --accent2: #38bdf8;
+            --good: #34d399;
+            --warn: #fbbf24;
+            --bad: #f87171;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient glow background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -40%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, rgba(168,85,247,0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── NAV ── */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(7,7,13,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-family: 'Space Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a855f7, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .nav-tag {
+            font-size: 11px;
+            color: var(--muted);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 70px 20px 50px;
+        }
+
+        .hero-eyebrow {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeUp 0.6s 0.1s forwards;
+        }
+
+        .hero h1 {
+            font-size: clamp(36px, 6vw, 60px);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 18px;
+            opacity: 0;
+            animation: fadeUp 0.6s 0.2s forwards;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #a855f7 20%, #38bdf8 80%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 16px;
+            color: var(--muted);
+            max-width: 480px;
+            margin: 0 auto 50px;
+            line-height: 1.7;
+            opacity: 0;
+            animation: fadeUp 0.6s 0.3s forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── CARD ── */
+        .card {
+            position: relative;
+            z-index: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 620px;
+            margin: 0 auto;
+            animation: fadeUp 0.6s 0.4s both;
+        }
+
+        .card-section-title {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 13px 16px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input[type="text"]:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(168,85,247,0.1);
+        }
+
+        select option { background: var(--surface); }
+
+        /* Upload area */
+        .upload-zone {
+            border: 1.5px dashed var(--border);
+            border-radius: 12px;
+            padding: 28px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg);
+        }
+
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(168,85,247,0.05);
+        }
+
+        .upload-zone input[type="file"] { display: none; }
+
+        .upload-icon { font-size: 28px; margin-bottom: 8px; }
+
+        .upload-label {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .upload-label strong { color: var(--accent); }
+
+        .file-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            background: rgba(168,85,247,0.1);
+            border: 1px solid rgba(168,85,247,0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: var(--accent);
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Optional section */
+        .optional-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            margin-bottom: 0;
+            padding: 14px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .optional-toggle span {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .optional-toggle .chevron {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--muted);
+            transition: transform 0.2s;
+        }
+
+        .optional-toggle.open .chevron { transform: rotate(180deg); }
+
+        .optional-section {
+            display: none;
+            padding-top: 16px;
+            animation: fadeUp 0.3s forwards;
+        }
+
+        .optional-section.open { display: block; }
+
+        .hint {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        /* Button */
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #a855f7, #38bdf8);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .btn:hover { opacity: 0.92; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        /* ── LOADING ── */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .loader-ring {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+
+        .loader-ring::before, .loader-ring::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid transparent;
+        }
+
+        .loader-ring::before {
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+
+        .loader-ring::after {
+            border-bottom-color: var(--accent2);
+            animation: spin 1.3s linear infinite reverse;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading p {
+            color: var(--muted);
+            font-size: 14px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* ── RESULTS ── */
+        .results {
+            display: none;
+            position: relative;
+            z-index: 1;
+            max-width: 660px;
+            margin: 0 auto;
+            padding: 0 20px 80px;
+            animation: fadeUp 0.5s forwards;
+        }
+
+        .results-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .results-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        /* Bias verdict badge */
+        .verdict-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .verdict-badge.biased {
+            background: rgba(248,113,113,0.1);
+            border: 1px solid rgba(248,113,113,0.3);
+            color: var(--bad);
+        }
+
+        .verdict-badge.fair {
+            background: rgba(52,211,153,0.1);
+            border: 1px solid rgba(52,211,153,0.3);
+            color: var(--good);
+        }
+
+        .verdict-badge.warn {
+            background: rgba(251,191,36,0.1);
+            border: 1px solid rgba(251,191,36,0.3);
+            color: var(--warn);
+        }
+
+        /* Metrics grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .metrics-grid { grid-template-columns: 1fr; }
+        }
+
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 22px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+        }
+
+        .metric-card.good::before { background: var(--good); }
+        .metric-card.warn::before { background: var(--warn); }
+        .metric-card.bad::before  { background: var(--bad); }
+        .metric-card.neutral::before { background: var(--border); }
+
+        .metric-label {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .metric-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .metric-value.good  { color: var(--good); }
+        .metric-value.warn  { color: var(--warn); }
+        .metric-value.bad   { color: var(--bad); }
+        .metric-value.neutral { color: var(--muted); }
+
+        .metric-hint {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* Group comparison bar */
+        .group-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 14px;
+        }
+
+        .group-card h4 {
+            font-size: 12px;
+            font-family: 'Space Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .group-row {
+            margin-bottom: 14px;
+        }
+
+        .group-row:last-child { margin-bottom: 0; }
+
+        .group-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .group-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .group-rate {
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        .bar-track {
+            height: 6px;
+            background: var(--bg);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .bar-fill.group0 { background: linear-gradient(90deg, #a855f7, #818cf8); }
+        .bar-fill.group1 { background: linear-gradient(90deg, #38bdf8, #34d399); }
+
+        /* Explanation card */
+        .explanation-card {
+            background: var(--surface);
+            border: 1px solid rgba(168,85,247,0.2);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 14px;
+        }
+
+        .explanation-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .gemini-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .explanation-header span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .explanation-text {
+            color: #c0c0d8;
+            line-height: 1.85;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        /* Meta info */
+        .meta-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            justify-content: center;
+        }
+
+        .meta-pill {
+            font-size: 11px;
+            font-family: 'Space Mono', monospace;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 12px;
+            color: var(--muted);
+        }
+
+        /* Reset */
+        .reset-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        /* Error toast */
+        .error-box {
+            background: rgba(248,113,113,0.08);
+            border: 1px solid rgba(248,113,113,0.25);
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: #fca5a5;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 16px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">Noxis</div>
+    <div class="nav-tag">AI Fairness Audit</div>
+</nav>
+
+<div class="hero">
+    <div class="hero-eyebrow">Powered by AIF360 + Gemini</div>
+    <h1>Detect <span>AI Bias</span><br>Before It Harms</h1>
+    <p>Upload your dataset (and optionally your trained model) to audit for discrimination across gender, race, age, and more.</p>
+</div>
+
+<!-- Upload Card -->
+<div class="card" id="uploadCard">
+
+    <div class="card-section-title">01 — Dataset</div>
+
+    <div class="form-group">
+        <label>Upload CSV File</label>
+        <div class="upload-zone" id="csvZone" onclick="document.getElementById('csvInput').click()">
+            <input type="file" id="csvInput" accept=".csv" onchange="handleCSV(this)">
+            <div class="upload-icon">📊</div>
+            <div class="upload-label"><strong>Click to upload</strong> or drag & drop</div>
+            <div class="upload-label" style="font-size:12px; margin-top:4px">.csv files only</div>
+            <div id="csvBadge" class="file-badge" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Sensitive Attribute Column</label>
+        <input type="text" id="sensitiveAttr" placeholder="e.g. gender, race, age">
+        <div class="hint">The protected attribute you want to test for bias</div>
+    </div>
+
+    <div class="form-group">
+        <label>Target Label Column</label>
+        <input type="text" id="labelCol" placeholder="e.g. loan_approved, hired">
+    </div>
+
+    <div class="form-group">
+        <label>Favorable Label Value</label>
+        <select id="favorableLabel">
+            <option value="1">1 — Positive outcome (Approved / Hired / Yes)</option>
+            <option value="0">0 — Negative outcome (Rejected / No)</option>
+        </select>
+    </div>
+
+    <!-- Optional: Model / Prediction column -->
+    <div class="optional-toggle" id="optToggle" onclick="toggleOptional()">
+        <span>⚙ Optional: upload trained model or provide prediction column</span>
+        <span class="chevron">▼</span>
+    </div>
+
+    <div class="optional-section" id="optSection">
+
+        <div class="card-section-title" style="margin-top:16px">02 — Model (Optional)</div>
+
+        <div class="form-group">
+            <label>Trained Model File (.pkl)</label>
+            <div class="upload-zone" id="modelZone" onclick="document.getElementById('modelInput').click()">
+                <input type="file" id="modelInput" accept=".pkl" onchange="handleModel(this)">
+                <div class="upload-icon">🤖</div>
+                <div class="upload-label"><strong>Click to upload</strong> your .pkl model</div>
+                <div id="modelBadge" class="file-badge" style="display:none"></div>
+            </div>
+            <div class="hint">Scikit-learn or compatible model. We'll run predictions and audit them.</div>
+        </div>
+
+        <div class="form-group">
+            <label>— or — Existing Prediction Column</label>
+            <input type="text" id="predCol" placeholder="e.g. predicted, model_output">
+            <div class="hint">If your CSV already has a predictions column from your model</div>
+        </div>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <button class="btn" onclick="analyze()" id="analyzeBtn">Analyze for Bias →</button>
+</div>
+
+<!-- Loading -->
+<div class="loading" id="loading">
+    <div class="loader-ring"></div>
+    <p id="loadingMsg">Running fairness audit...</p>
+</div>
+
+<!-- Results -->
+<div class="results" id="results">
+    <div class="results-header">
+        <h2>Audit Report</h2>
+        <div id="metaRow" class="meta-row"></div>
+        <div id="verdictBadge" style="margin-bottom: 20px;"></div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <!-- Group comparison -->
+    <div class="group-card" id="groupCard"></div>
+
+    <!-- Gemini explanation -->
+    <div class="explanation-card">
+        <div class="explanation-header">
+            <div class="gemini-dot"></div>
+            <span>Gemini Analysis</span>
+        </div>
+        <div class="explanation-text" id="explanationText"></div>
+    </div>
+
+    <button class="reset-btn" onclick="resetForm()">← Analyze Another Dataset</button>
+</div>
+
+<script>
+    let csvFile = null;
+    let modelFile = null;
+
+    function handleCSV(input) {
+        csvFile = input.files[0];
+        const badge = document.getElementById('csvBadge');
+        badge.textContent = '📄 ' + csvFile.name;
+        badge.style.display = 'inline-flex';
+    }
+
+    function handleModel(input) {
+        modelFile = input.files[0];
+        const badge = document.getElementById('modelBadge');
+        badge.textContent = '🤖 ' + modelFile.name;
+        badge.style.display = 'inline-flex';
+    }
+
+    function toggleOptional() {
+        const tog = document.getElementById('optToggle');
+        const sec = document.getElementById('optSection');
+        tog.classList.toggle('open');
+        sec.classList.toggle('open');
+    }
+
+    // Drag and drop
+    const csvZone = document.getElementById('csvZone');
+    csvZone.addEventListener('dragover', e => { e.preventDefault(); csvZone.classList.add('drag-over'); });
+    csvZone.addEventListener('dragleave', () => csvZone.classList.remove('drag-over'));
+    csvZone.addEventListener('drop', e => {
+        e.preventDefault();
+        csvZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files[0] && files[0].name.endsWith('.csv')) {
+            csvFile = files[0];
+            const badge = document.getElementById('csvBadge');
+            badge.textContent = '📄 ' + csvFile.name;
+            badge.style.display = 'inline-flex';
+        }
+    });
+
+    function showError(msg) {
+        const box = document.getElementById('errorBox');
+        box.textContent = '⚠ ' + msg;
+        box.style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('errorBox').style.display = 'none';
+    }
+
+    async function analyze() {
+        hideError();
+        if (!csvFile) return showError('Please upload a CSV file.');
+        const sensitiveAttr = document.getElementById('sensitiveAttr').value.trim();
+        const labelCol = document.getElementById('labelCol').value.trim();
+        if (!sensitiveAttr || !labelCol) return showError('Please fill in Sensitive Attribute and Target Label fields.');
+
+        const formData = new FormData();
+        formData.append('dataset', csvFile);
+        formData.append('sensitive_attr', sensitiveAttr);
+        formData.append('label_col', labelCol);
+        formData.append('favorable_label', document.getElementById('favorableLabel').value);
+
+        const predCol = document.getElementById('predCol').value.trim();
+        if (predCol) formData.append('pred_col', predCol);
+        if (modelFile) formData.append('model', modelFile);
+
+        document.getElementById('uploadCard').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+
+        const msgs = [
+            'Loading your dataset...',
+            'Running AIF360 fairness checks...',
+            'Computing bias metrics...',
+            'Asking Gemini to explain...'
+        ];
+        let mi = 0;
+        const msgEl = document.getElementById('loadingMsg');
+        const interval = setInterval(() => {
+            mi = (mi + 1) % msgs.length;
+            msgEl.textContent = msgs[mi];
+        }, 1800);
+
+        try {
+            const res = await fetch('/analyze', { method: 'POST', body: formData });
+            const data = await res.json();
+            clearInterval(interval);
+            document.getElementById('loading').style.display = 'none';
+
+            if (data.success) {
+                renderResults(data);
+            } else {
+                document.getElementById('uploadCard').style.display = 'block';
+                showError(data.error || 'An unknown error occurred.');
+            }
+        } catch (e) {
+            clearInterval(interval);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('uploadCard').style.display = 'block';
+            showError('Could not reach the server. Is Flask running?');
+        }
+    }
+
+    function metricClass(val, goodMin, goodMax) {
+        if (val === null || val === undefined) return 'neutral';
+        if (val >= goodMin && val <= goodMax) return 'good';
+        const range = goodMax - goodMin;
+        const slack = range * 1.5;
+        if (val >= goodMin - slack && val <= goodMax + slack) return 'warn';
+        return 'bad';
+    }
+
+    function renderResults(data) {
+        // Meta pills
+        const metaRow = document.getElementById('metaRow');
+        metaRow.innerHTML = `
+            <span class="meta-pill">📊 ${data.row_count} rows</span>
+            <span class="meta-pill">🔑 ${data.sensitive_attr}</span>
+            <span class="meta-pill">🎯 ${data.label_col}</span>
+            ${data.model_used ? '<span class="meta-pill">🤖 Model uploaded</span>' : ''}
+        `;
+
+        // Verdict
+        const di = data.disparate_impact;
+        const sp = data.stat_parity;
+        let isBiased = (di !== null && (di < 0.8 || di > 1.2)) || (sp !== null && Math.abs(sp) > 0.1);
+        let isMarginal = !isBiased && ((di !== null && (di < 0.85 || di > 1.15)) || (sp !== null && Math.abs(sp) > 0.05));
+
+        const verdictEl = document.getElementById('verdictBadge');
+        if (isBiased) {
+            verdictEl.innerHTML = '<span class="verdict-badge biased">⚠ Bias Detected</span>';
+        } else if (isMarginal) {
+            verdictEl.innerHTML = '<span class="verdict-badge warn">⚡ Marginal — Monitor Closely</span>';
+        } else {
+            verdictEl.innerHTML = '<span class="verdict-badge fair">✓ Appears Fair</span>';
+        }
+
+        // Metrics grid
+        const metrics = [];
+
+        if (di !== null) {
+            const cls = metricClass(di, 0.8, 1.2);
+            metrics.push({ label: 'Disparate Impact', value: di, cls, hint: 'Fair: 0.8 – 1.2' });
+        }
+        if (sp !== null) {
+            const cls = metricClass(Math.abs(sp) < 0.1 ? 0.05 : 99, 0, 0.1);
+            const c2 = (Math.abs(sp) <= 0.1) ? 'good' : (Math.abs(sp) <= 0.2 ? 'warn' : 'bad');
+            metrics.push({ label: 'Stat. Parity Diff.', value: sp, cls: c2, hint: 'Fair: –0.1 to 0.1' });
+        }
+        if (data.eq_odds_diff !== null && data.eq_odds_diff !== undefined) {
+            const c = (Math.abs(data.eq_odds_diff) <= 0.1) ? 'good' : (Math.abs(data.eq_odds_diff) <= 0.2 ? 'warn' : 'bad');
+            metrics.push({ label: 'Equal Opp. Diff.', value: data.eq_odds_diff, cls: c, hint: 'Fair: near 0' });
+        }
+        if (data.avg_odds_diff !== null && data.avg_odds_diff !== undefined) {
+            const c = (Math.abs(data.avg_odds_diff) <= 0.1) ? 'good' : (Math.abs(data.avg_odds_diff) <= 0.2 ? 'warn' : 'bad');
+            metrics.push({ label: 'Avg. Odds Diff.', value: data.avg_odds_diff, cls: c, hint: 'Fair: near 0' });
+        }
+
+        const grid = document.getElementById('metricsGrid');
+        grid.innerHTML = metrics.map(m => `
+            <div class="metric-card ${m.cls}">
+                <div class="metric-label">${m.label}</div>
+                <div class="metric-value ${m.cls}">${m.value}</div>
+                <div class="metric-hint">${m.hint}</div>
+            </div>
+        `).join('');
+
+        // Group comparison
+        const groupCard = document.getElementById('groupCard');
+        const gs = data.group_stats;
+        const groups = Object.entries(gs);
+        const maxRate = Math.max(...groups.map(([, v]) => v.favorable_rate || 0));
+
+        groupCard.innerHTML = `
+            <h4>Group Outcome Comparison</h4>
+            ${groups.map(([name, v], i) => `
+                <div class="group-row">
+                    <div class="group-row-header">
+                        <span class="group-name">${name}</span>
+                        <span class="group-rate">${v.favorable_rate !== null ? (v.favorable_rate * 100).toFixed(1) + '%' : 'N/A'} favorable &nbsp;·&nbsp; ${v.count} rows</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill group${i}" style="width: ${maxRate > 0 ? ((v.favorable_rate || 0) / maxRate * 100) : 0}%"></div>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+
+        // Gemini explanation
+        document.getElementById('explanationText').textContent = data.explanation;
+
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function resetForm() {
+        document.getElementById('uploadCard').style.display = 'block';
+        document.getElementById('results').style.display = 'none';
+        document.getElementById('csvBadge').style.display = 'none';
+        document.getElementById('modelBadge').style.display = 'none';
+        document.getElementById('sensitiveAttr').value = '';
+        document.getElementById('labelCol').value = '';
+        document.getElementById('predCol').value = '';
+        csvFile = null;
+        modelFile = null;
+        hideError();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+</script>
+</body>
+</html>
