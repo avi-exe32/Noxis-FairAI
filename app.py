@@ -197,26 +197,21 @@ def analyze():
              for g, v in group_stats.items()]
         )
 
-        prompt = f"""You are an AI fairness expert reviewing a bias audit report.
+        prompt = f"""Bias audit on '{sensitive_attr}' → '{label_col}':
+Groups: {grp_str}
+Disparate Impact: {disparate_impact} (fair: 0.8–1.2)
+Statistical Parity: {stat_parity} (fair: -0.1–0.1)
 
-Dataset analysis on sensitive attribute: '{sensitive_attr}' and target: '{label_col}'
+Give:
+1. Verdict (biased or not)
+2. Disadvantaged group + how much
+3. Severity: Low/Medium/High
+4. 2 specific fixes
 
-Group statistics:
-{grp_str}
-
-Fairness metrics:
-{metrics_summary}
-
-Please provide:
-1. A verdict: is this model/dataset biased? (be direct)
-2. Which group is disadvantaged and by how much (use the numbers)
-3. Severity: Low / Medium / High
-4. 3 specific, actionable recommendations to reduce bias
-
-Be concise, clear, and avoid jargon. Use bullet points for recommendations.
-"""
+Max 150 words. Be direct."""
+        
         gemini_resp = client.models.generate_content(
-            model='gemini-3-flash-preview', 
+            model='gemini-3.1-pro-preview', 
             contents=prompt
         )
         explanation = gemini_resp.text
@@ -240,6 +235,48 @@ Be concise, clear, and avoid jargon. Use bullet points for recommendations.
         import traceback
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
 
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        audit_context = data.get('context', {})
+        history = data.get('history', [])
+
+        if not user_message:
+            return jsonify({'success': False, 'error': 'Empty message'})
+
+        # Build system context from the audit results
+        system_context = f"""You are Noxis, an AI bias auditor.
+Audit results: attribute='{audit_context.get('sensitive_attr')}', label='{audit_context.get('label_col')}'
+Disparate Impact: {audit_context.get('disparate_impact')} | Statistical Parity: {audit_context.get('stat_parity')}
+Groups: {audit_context.get('group_stats')}
+Answer the user's question about this audit in max 100 words. Be direct."""
+
+        # Build messages array with history
+        messages = [{'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]}]
+        
+        # Add conversation history (last 6 messages to keep context manageable)
+        if history:
+            messages = []
+            for turn in history[-6:]:
+                messages.append({'role': turn['role'], 'parts': [{'text': turn['text']}]})
+            # Inject context into the latest user message
+            messages.append({'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]})
+
+        response = client.models.generate_content(
+            model='gemini-3-flash-preview',
+            contents=messages
+        )
+
+        return jsonify({
+            'success': True,
+            'reply': response.text
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -583,7 +583,149 @@
             border-color: var(--accent);
             color: var(--text);
         }
+        
+        /* ── CHAT ── */
+        .chat-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
 
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .chat-header span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .chat-header .chat-chevron {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--muted);
+            transition: transform 0.2s;
+        }
+
+        .chat-header.open .chat-chevron { transform: rotate(180deg); }
+
+        .chat-body { display: none; padding: 20px 24px; }
+        .chat-body.open { display: block; }
+
+        .chat-messages {
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-right: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar { width: 4px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+        .chat-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .chat-bubble.user {
+            align-self: flex-end;
+            background: rgba(168,85,247,0.15);
+            border: 1px solid rgba(168,85,247,0.25);
+            color: var(--text);
+        }
+
+        .chat-bubble.assistant {
+            align-self: flex-start;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: #c0c0d8;
+        }
+
+        .chat-bubble.typing {
+            align-self: flex-start;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            outline: none;
+            resize: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus { border-color: var(--accent); }
+
+        .chat-send-btn {
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #a855f7, #38bdf8);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .chat-send-btn:hover { opacity: 0.85; }
+        .chat-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .chat-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .suggestion-chip {
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .suggestion-chip:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
         /* Error toast */
         .error-box {
             background: rgba(248,113,113,0.08);
@@ -708,6 +850,30 @@
         <div class="explanation-text" id="explanationText"></div>
     </div>
 
+    <!-- Chat -->
+<div class="chat-section">
+    <div class="chat-header" id="chatHeader" onclick="toggleChat()">
+        <div class="gemini-dot"></div>
+        <span>Ask Noxis About Your Results</span>
+        <span class="chat-chevron">▼</span>
+    </div>
+    <div class="chat-body" id="chatBody">
+        <div class="chat-suggestions" id="chatSuggestions">
+            <span class="suggestion-chip" onclick="sendSuggestion(this)">Why is my model biased?</span>
+            <span class="suggestion-chip" onclick="sendSuggestion(this)">Which group is most affected?</span>
+            <span class="suggestion-chip" onclick="sendSuggestion(this)">How do I fix this?</span>
+            <span class="suggestion-chip" onclick="sendSuggestion(this)">Explain disparate impact simply</span>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+            <textarea class="chat-input" id="chatInput" rows="2"
+                placeholder="Ask anything about your audit results..."
+                onkeydown="handleChatKey(event)"></textarea>
+            <button class="chat-send-btn" id="chatSendBtn" onclick="sendChat()">↑</button>
+        </div>
+    </div>
+</div>
+
     <button class="reset-btn" onclick="resetForm()">← Analyze Another Dataset</button>
 </div>
 
@@ -826,6 +992,7 @@
 
     function renderResults(data) {
         // Meta pills
+        auditContext = data;
         const metaRow = document.getElementById('metaRow');
         metaRow.innerHTML = `
             <span class="meta-pill">📊 ${data.row_count} rows</span>
@@ -920,6 +1087,84 @@
         hideError();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // ── CHAT ────────────────────────────────────────────
+let chatHistory = [];
+let auditContext = {};
+
+function toggleChat() {
+    const header = document.getElementById('chatHeader');
+    const body = document.getElementById('chatBody');
+    header.classList.toggle('open');
+    body.classList.toggle('open');
+}
+
+function handleChatKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+    }
+}
+
+function sendSuggestion(el) {
+    document.getElementById('chatInput').value = el.textContent;
+    // Hide suggestions after first use
+    document.getElementById('chatSuggestions').style.display = 'none';
+    sendChat();
+}
+
+function appendBubble(role, text) {
+    const msgs = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = `chat-bubble ${role}`;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+}
+
+async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const btn = document.getElementById('chatSendBtn');
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = '';
+    btn.disabled = true;
+    document.getElementById('chatSuggestions').style.display = 'none';
+
+    appendBubble('user', message);
+    const typingBubble = appendBubble('typing', 'Noxis is thinking...');
+
+    chatHistory.push({ role: 'user', text: message });
+
+    try {
+        const res = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message,
+                context: auditContext,
+                history: chatHistory
+            })
+        });
+        const data = await res.json();
+        typingBubble.remove();
+
+        if (data.success) {
+            appendBubble('assistant', data.reply);
+            chatHistory.push({ role: 'model', text: data.reply });
+        } else {
+            appendBubble('assistant', 'Error: ' + data.error);
+        }
+    } catch (e) {
+        typingBubble.remove();
+        appendBubble('assistant', 'Could not reach server.');
+    }
+
+    btn.disabled = false;
+    input.focus();
+}
 </script>
 </body>
 </html>
