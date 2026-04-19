@@ -386,6 +386,44 @@
             color: var(--warn);
         }
 
+        .grade-circle {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            border: 3px solid;
+            position: relative;
+        }
+
+        .grade-circle.A { border-color: var(--good); background: rgba(52,211,153,0.1); }
+        .grade-circle.B { border-color: #86efac; background: rgba(134,239,172,0.1); }
+        .grade-circle.C { border-color: var(--warn); background: rgba(251,191,36,0.1); }
+        .grade-circle.D { border-color: #fb923c; background: rgba(251,146,60,0.1); }
+        .grade-circle.F { border-color: var(--bad); background: rgba(248,113,113,0.1); }
+
+        .grade-letter {
+            font-family: 'Space Mono', monospace;
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .grade-circle.A .grade-letter { color: var(--good); }
+        .grade-circle.B .grade-letter { color: #86efac; }
+        .grade-circle.C .grade-letter { color: var(--warn); }
+        .grade-circle.D .grade-letter { color: #fb923c; }
+        .grade-circle.F .grade-letter { color: var(--bad); }
+
+        .grade-score {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'Space Mono', monospace;
+        }
+
         /* Metrics grid */
         .metrics-grid {
             display: grid;
@@ -832,6 +870,7 @@
     <div class="results-header">
         <h2>Audit Report</h2>
         <div id="metaRow" class="meta-row"></div>
+        <div id="gradeCircle" style="margin-bottom: 16px;"></div>
         <div id="verdictBadge" style="margin-bottom: 20px;"></div>
     </div>
 
@@ -993,6 +1032,14 @@
     function renderResults(data) {
         // Meta pills
         auditContext = data;
+        // Grade circle
+        const gradeEl = document.getElementById('gradeCircle');
+        gradeEl.innerHTML = `
+            <div class="grade-circle ${data.grade}">
+                <div class="grade-letter">${data.grade}</div>
+                <div class="grade-score">${data.grade_score}/100</div>
+            </div>
+        `;
         const metaRow = document.getElementById('metaRow');
         metaRow.innerHTML = `
             <span class="meta-pill">📊 ${data.row_count} rows</span>

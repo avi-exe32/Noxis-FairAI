@@ -1,14 +1,29 @@
-# Ignore sensitive keys and environments
+# Environments & Keys
 .env
+.venv/
+env/
 venv/
+instance/
 .vscode/
 
-# Ignore large data and temporary files
-uploads/
+# GCP Service Account Keys (Specific & Catch-all)
+gcp-key.json
+*-key.json
+credentials.json
+# Be careful with *.json if you have legitimate config files, 
+# but for now, it's the safest way to prevent a leak.
+*.json 
+
+# Python temporary files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Data & Uploads
+uploads/
 *.csv
 *.pkl
+*.xlsx
 
 # Project specific
 archive/

@@ -13,9 +13,12 @@ load_dotenv()
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs('uploads', exist_ok=True)
-API_KEY = os.getenv('GEMINI_API_KEY')
-# 2. Initialize the 2026 Client (No more genai.configure)
-client = genai.Client(api_key=API_KEY)
+
+client = genai.Client(
+    vertexai=True, 
+    project='noxis2',      # Make sure this matches your new project ID
+    location='global' 
+)
 
 
 def safe_metric(fn):
@@ -28,6 +31,31 @@ def safe_metric(fn):
     except Exception:
         return None
 
+def calculate_grade(disparate_impact, stat_parity):
+    score = 100
+    
+    if disparate_impact is not None:
+        di_dev = abs(1 - disparate_impact)
+        if di_dev <= 0.05: score -= 0
+        elif di_dev <= 0.1: score -= 10
+        elif di_dev <= 0.2: score -= 25
+        elif di_dev <= 0.3: score -= 40
+        else: score -= 60
+
+    if stat_parity is not None:
+        sp_dev = abs(stat_parity)
+        if sp_dev <= 0.05: score -= 0
+        elif sp_dev <= 0.1: score -= 10
+        elif sp_dev <= 0.2: score -= 25
+        elif sp_dev <= 0.3: score -= 40
+        else: score -= 60
+
+    score = max(0, score)
+    if score >= 90: return 'A', score
+    elif score >= 75: return 'B', score
+    elif score >= 60: return 'C', score
+    elif score >= 40: return 'D', score
+    else: return 'F', score
 
 @app.route('/')
 def index():
@@ -146,6 +174,7 @@ def analyze():
 
         disparate_impact = safe_metric(ds_metric.disparate_impact)
         stat_parity      = safe_metric(ds_metric.statistical_parity_difference)
+        grade, grade_score = calculate_grade(disparate_impact, stat_parity)
 
         # Classification metrics (if predictions available)
         eq_odds_diff = None
@@ -208,15 +237,18 @@ Give:
 3. Severity: Low/Medium/High
 4. 2 specific fixes
 
-Max 150 words. Be direct."""
+Max 150 words. Be direct. Do not introduce yourself. Do not use any markdown formatting like ** or *."""
         
         gemini_resp = client.models.generate_content(
             model='gemini-3.1-pro-preview', 
             contents=prompt
         )
-        explanation = gemini_resp.text
+        # Strip out the markdown stars
+        explanation = gemini_resp.text.replace("**", "").replace("*", "")
 
         return jsonify({
+            'grade': grade,
+            'grade_score': grade_score,
             'success': True,
             'disparate_impact': disparate_impact,
             'stat_parity': stat_parity,
@@ -229,6 +261,7 @@ Max 150 words. Be direct."""
             'group_stats': group_stats,
             'model_used': model_used,
             'row_count': len(df)
+            
         })
 
     except Exception as e:
@@ -248,11 +281,11 @@ def chat():
             return jsonify({'success': False, 'error': 'Empty message'})
 
         # Build system context from the audit results
-        system_context = f"""You are Noxis, an AI bias auditor.
+        system_context = f"""You are an AI bias auditor.
 Audit results: attribute='{audit_context.get('sensitive_attr')}', label='{audit_context.get('label_col')}'
 Disparate Impact: {audit_context.get('disparate_impact')} | Statistical Parity: {audit_context.get('stat_parity')}
 Groups: {audit_context.get('group_stats')}
-Answer the user's question about this audit in max 100 words. Be direct."""
+Answer the user's question about this audit in max 100 words. Be direct. Do not introduce yourself. Use plain text only and do not use markdown formatting like ** or *."""
 
         # Build messages array with history
         messages = [{'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]}]
@@ -266,13 +299,14 @@ Answer the user's question about this audit in max 100 words. Be direct."""
             messages.append({'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]})
 
         response = client.models.generate_content(
-            model='gemini-3-flash-preview',
+            model="gemini-3-flash-preview",
             contents=messages
         )
+        clean_reply = response.text.replace("**", "").replace("*", "")
 
         return jsonify({
             'success': True,
-            'reply': response.text
+            'reply': clean_reply
         })
 
     except Exception as e:
