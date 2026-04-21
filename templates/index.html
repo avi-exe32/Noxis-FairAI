@@ -738,8 +738,86 @@
             flex-shrink: 0;
         }
 
+
+
         .chat-send-btn:hover { opacity: 0.85; }
         .chat-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .mitigate-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            border: 1px solid rgba(56,189,248,0.4);
+            border-radius: 12px;
+            color: var(--accent2);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .mitigate-btn:hover {
+            background: rgba(56,189,248,0.08);
+            border-color: var(--accent2);
+        }
+
+        .mitigate-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .strategy-card {
+            background: var(--surface);
+            border: 1px solid rgba(56,189,248,0.2);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 14px;
+            display: none;
+            animation: fadeUp 0.4s forwards;
+        }
+
+        .strategy-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .strategy-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent2);
+            box-shadow: 0 0 8px var(--accent2);
+        }
+
+        .strategy-header span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent2);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .strategy-text {
+            color: #c0c0d8;
+            line-height: 1.85;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .strategy-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--muted);
+            font-size: 13px;
+            display: none;
+        }
 
         .chat-suggestions {
             display: flex;
@@ -888,6 +966,24 @@
         </div>
         <div class="explanation-text" id="explanationText"></div>
     </div>
+
+
+<!-- Mitigation Strategy -->
+<button class="mitigate-btn" id="mitigateBtn" onclick="generateStrategy()">
+    ⚡ Generate Fix Strategy
+</button>
+<div class="strategy-loading" id="strategyLoading">
+    <div class="spinner" style="width:24px;height:24px;margin:0 auto 10px"></div>
+    Gemini is crafting your mitigation plan...
+</div>
+<div class="strategy-card" id="strategyCard">
+    <div class="strategy-header">
+        <div class="strategy-dot"></div>
+        <span>Mitigation Strategy</span>
+    </div>
+    <div class="strategy-text" id="strategyText"></div>
+</div>
+
 
     <!-- Chat -->
 <div class="chat-section">
@@ -1212,6 +1308,46 @@ async function sendChat() {
     btn.disabled = false;
     input.focus();
 }
+
+async function generateStrategy() {
+    const btn = document.getElementById('mitigateBtn');
+    const loading = document.getElementById('strategyLoading');
+    const card = document.getElementById('strategyCard');
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    loading.style.display = 'block';
+    card.style.display = 'none';
+
+    try {
+        const res = await fetch('/mitigate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context: auditContext })
+        });
+        const data = await res.json();
+        
+        loading.style.display = 'none';
+
+        if (data.success) {
+            document.getElementById('strategyText').textContent = data.strategy;
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            btn.textContent = '⚡ Regenerate Fix Strategy';
+            btn.disabled = false;
+        } else {
+            alert('Error: ' + data.error);
+            btn.textContent = '⚡ Generate Fix Strategy';
+            btn.disabled = false;
+        }
+    } catch (e) {
+        loading.style.display = 'none';
+        alert('Could not reach server.');
+        btn.textContent = '⚡ Generate Fix Strategy';
+        btn.disabled = false;
+    }
+}
+
 </script>
 </body>
 </html>

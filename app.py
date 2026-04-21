@@ -7,7 +7,13 @@ from google import genai
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
 from dotenv import load_dotenv
-
+import shap
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+import time
 
 load_dotenv()
 app = Flask(__name__)
@@ -308,6 +314,50 @@ Answer the user's question about this audit in max 100 words. Be direct. Do not 
             'success': True,
             'reply': clean_reply
         })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/mitigate', methods=['POST'])
+def mitigate():
+    try:
+        data = request.get_json()
+        audit_context = data.get('context', {})
+        
+        di = audit_context.get('disparate_impact')
+        sp = audit_context.get('stat_parity')
+        grade = audit_context.get('grade')
+        attr = audit_context.get('sensitive_attr')
+        label = audit_context.get('label_col')
+        groups = audit_context.get('group_stats', {})
+
+        prompt = f"""Bias audit: attribute='{attr}', label='{label}', grade={grade}
+Disparate Impact: {di}, Statistical Parity: {sp}
+
+Reply with exactly:
+TECHNIQUE: [best AIF360 fix and why in one sentence]
+CODE: [exact Python snippet using aif360 with attribute='{attr}', label='{label}']
+EXPECTED: [new DI and SP ranges after fix]
+ALTERNATIVES: [2 other options, one line each]
+WARNING: [one tradeoff]
+
+Plain text, no markdown, max 200 words."""
+
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model='gemini-3.1-pro-preview',
+                    contents=prompt
+                )
+                break
+            except Exception as e:
+                if '429' in str(e) and attempt < 2:
+                    time.sleep(10)
+                    continue
+                raise e
+        clean = response.text.replace("**", "").replace("*", "")
+        
+        return jsonify({'success': True, 'strategy': clean})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
