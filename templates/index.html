@@ -854,6 +854,54 @@
             margin-top: 16px;
             display: none;
         }
+
+        /* ── CODE GENERATION UI ── */
+        .code-block-container {
+            background: #090911;
+            border: 1px solid rgba(56,189,248,0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #121220;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-filename {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: var(--accent2);
+        }
+        .code-actions button {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 8px;
+            font-family: 'DM Sans', sans-serif;
+            transition: all 0.2s;
+        }
+        .code-actions button:hover {
+            border-color: var(--accent2);
+            background: rgba(56,189,248,0.1);
+        }
+        .code-body {
+            margin: 0;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            color: #e2e8f0;
+            line-height: 1.6;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -969,19 +1017,32 @@
 
 
 <!-- Mitigation Strategy -->
+<!-- Mitigation Strategy -->
 <button class="mitigate-btn" id="mitigateBtn" onclick="generateStrategy()">
-    ⚡ Generate Fix Strategy
+    ⚡ Generate Python Mitigation Script
 </button>
 <div class="strategy-loading" id="strategyLoading">
     <div class="spinner" style="width:24px;height:24px;margin:0 auto 10px"></div>
-    Gemini is crafting your mitigation plan...
+    Gemini is writing the python script...
 </div>
 <div class="strategy-card" id="strategyCard">
     <div class="strategy-header">
         <div class="strategy-dot"></div>
-        <span>Mitigation Strategy</span>
+        <span>Auto-Generated Mitigation Script</span>
     </div>
-    <div class="strategy-text" id="strategyText"></div>
+    <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">
+        Run this Python file in the same folder as your CSV to generate a new, reweighed dataset that mathematically offsets the bias.
+    </div>
+    <div class="code-block-container">
+        <div class="code-header">
+            <span class="code-filename">mitigate_bias.py</span>
+            <div class="code-actions">
+                <button id="copyBtn" onclick="copyCode()">Copy Code</button>
+                <button onclick="downloadCode()">Download .py</button>
+            </div>
+        </div>
+        <pre class="code-body"><code id="strategyCode"></code></pre>
+    </div>
 </div>
 
 
@@ -1309,13 +1370,34 @@ async function sendChat() {
     input.focus();
 }
 
+function copyCode() {
+    const code = document.getElementById('strategyCode').textContent;
+    navigator.clipboard.writeText(code);
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.textContent = 'Copy Code'; }, 2000);
+}
+
+function downloadCode() {
+    const code = document.getElementById('strategyCode').textContent;
+    const blob = new Blob([code], { type: 'text/x-python' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mitigate_bias.py';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 async function generateStrategy() {
     const btn = document.getElementById('mitigateBtn');
     const loading = document.getElementById('strategyLoading');
     const card = document.getElementById('strategyCard');
 
     btn.disabled = true;
-    btn.textContent = 'Generating...';
+    btn.textContent = 'Generating Script...';
     loading.style.display = 'block';
     card.style.display = 'none';
 
@@ -1330,10 +1412,11 @@ async function generateStrategy() {
         loading.style.display = 'none';
 
         if (data.success) {
-            document.getElementById('strategyText').textContent = data.strategy;
+            // Put the text in the code tag instead of standard text
+            document.getElementById('strategyCode').textContent = data.strategy;
             card.style.display = 'block';
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            btn.textContent = '⚡ Regenerate Fix Strategy';
+            btn.textContent = '⚡ Regenerate Script';
             btn.disabled = false;
         } else {
             alert('Error: ' + data.error);

@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
 import time
+import re
 
 load_dotenv()
 app = Flask(__name__)
@@ -136,7 +137,11 @@ def analyze():
             with open(pkl_path, 'rb') as f:
                 clf = pickle.load(f)
 
-            feature_cols = [c for c in df.columns if c not in [label_col, sensitive_attr]]
+            try:
+                feature_cols = clf.feature_names_in_.tolist()
+            except AttributeError:
+                feature_cols = [c for c in df.columns if c not in [label_col]]
+    
             X = df[feature_cols].select_dtypes(include=[np.number])
             preds = clf.predict(X)
             df['_prediction'] = preds
@@ -160,12 +165,15 @@ def analyze():
         # ── 8. Build AIF360 dataset ──────────────────────────────────────────
         unfav_label = 1 - favorable_label
 
+        weights_col = 'fair_weights' if 'fair_weights' in df.columns else None
+
         ground_truth_ds = BinaryLabelDataset(
-            df=df[[sensitive_attr, label_col]].copy(),
+            df=df[[sensitive_attr, label_col] + ([weights_col] if weights_col else [])].copy(),
             label_names=[label_col],
             protected_attribute_names=[sensitive_attr],
             favorable_label=favorable_label,
-            unfavorable_label=unfav_label
+            unfavorable_label=unfav_label,
+            instance_weights_name=weights_col # <--- THIS IS THE KEY FIX
         )
 
         priv_groups   = [{sensitive_attr: 1}]
@@ -208,10 +216,22 @@ def analyze():
 
         # ── 9. Group-level stats ─────────────────────────────────────────────
         group_stats = {}
+        # Check if the mitigated weights column exists in the uploaded CSV
+        weights_col = 'fair_weights' if 'fair_weights' in df.columns else None
+
         for grp_val in [0, 1]:
             grp_df = df[df[sensitive_attr] == grp_val]
             grp_name = group_names.get(str(grp_val), str(grp_val))
-            fav_rate = round(float((grp_df[label_col] == favorable_label).mean()), 4) if len(grp_df) else None
+            
+            if len(grp_df) > 0:
+                # If weights exist, use a weighted average; otherwise, use a standard mean
+                if weights_col:
+                    fav_rate = round(float(np.average(grp_df[label_col] == favorable_label, weights=grp_df[weights_col])), 4)
+                else:
+                    fav_rate = round(float((grp_df[label_col] == favorable_label).mean()), 4)
+            else:
+                fav_rate = None
+
             group_stats[grp_name] = {
                 'count': len(grp_df),
                 'favorable_rate': fav_rate
@@ -253,7 +273,7 @@ Max 150 words. Be direct. Do not introduce yourself. Do not use any markdown for
         explanation = gemini_resp.text.replace("**", "").replace("*", "")
 
         return jsonify({
-            'grade': grade,
+           'grade': grade,
             'grade_score': grade_score,
             'success': True,
             'disparate_impact': disparate_impact,
@@ -264,10 +284,10 @@ Max 150 words. Be direct. Do not introduce yourself. Do not use any markdown for
             'explanation': explanation,
             'sensitive_attr': sensitive_attr,
             'label_col': label_col,
+            'favorable_label': favorable_label, # <--- NEW
             'group_stats': group_stats,
             'model_used': model_used,
             'row_count': len(df)
-            
         })
 
     except Exception as e:
@@ -324,24 +344,34 @@ def mitigate():
         data = request.get_json()
         audit_context = data.get('context', {})
         
-        di = audit_context.get('disparate_impact')
-        sp = audit_context.get('stat_parity')
-        grade = audit_context.get('grade')
         attr = audit_context.get('sensitive_attr')
         label = audit_context.get('label_col')
-        groups = audit_context.get('group_stats', {})
+        favorable_label = audit_context.get('favorable_label', 1)
+        di = audit_context.get('disparate_impact', 'Unknown')
 
-        prompt = f"""Bias audit: attribute='{attr}', label='{label}', grade={grade}
-Disparate Impact: {di}, Statistical Parity: {sp}
+        # Overhaul prompt to strictly generate a Python script
+        prompt = f"""You are an AI fairness data engineer. 
+Write a complete, standalone Python script to mitigate bias in a CSV dataset using the `aif360` library.
 
-Reply with exactly:
-TECHNIQUE: [best AIF360 fix and why in one sentence]
-CODE: [exact Python snippet using aif360 with attribute='{attr}', label='{label}']
-EXPECTED: [new DI and SP ranges after fix]
-ALTERNATIVES: [2 other options, one line each]
-WARNING: [one tradeoff]
+Dataset Context:
+- Sensitive Attribute: '{attr}' (assumed binary 0/1, where 1 is privileged)
+- Target Label: '{label}'
+- Favorable Outcome Value: {favorable_label}
+- Current Disparate Impact: {di}
 
-Plain text, no markdown, max 200 words."""
+The Python script must:
+1. Import pandas and required AIF360 modules (BinaryLabelDataset, Reweighing).
+2. Load a file named 'dataset.csv' using pandas.
+3. Drop missing values in the key columns.
+4. Convert the dataframe into an AIF360 BinaryLabelDataset.
+5. Apply the Reweighing algorithm.
+6. Extract the newly calculated instance weights.
+7. Add these weights as a new column 'fair_weights' to the pandas dataframe.
+8. Save the mitigated dataframe to a new file named 'mitigated_dataset.csv'.
+
+IMPORTANT: Reply ONLY with valid, well-commented Python code. 
+Do not use Markdown formatting like ```python or ```. Do not add any conversational text before or after the code.
+"""
 
         for attempt in range(3):
             try:
@@ -355,9 +385,14 @@ Plain text, no markdown, max 200 words."""
                     time.sleep(10)
                     continue
                 raise e
-        clean = response.text.replace("**", "").replace("*", "")
         
-        return jsonify({'success': True, 'strategy': clean})
+        # Clean up in case Gemini still uses markdown codeblocks
+        clean_code = response.text
+        clean_code = re.sub(r'^```python\s*', '', clean_code, flags=re.IGNORECASE|re.MULTILINE)
+        clean_code = re.sub(r'^```\s*', '', clean_code, flags=re.MULTILINE)
+        clean_code = clean_code.strip()
+        
+        return jsonify({'success': True, 'strategy': clean_code})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
