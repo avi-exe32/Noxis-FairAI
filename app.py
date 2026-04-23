@@ -130,6 +130,8 @@ def analyze():
         pkl_file = request.files.get('model')
         predictions_col = None
 
+        shap_base64 = None
+
         if pkl_file and pkl_file.filename != '':
             pkl_path = os.path.join(app.config['UPLOAD_FOLDER'], pkl_file.filename)
             pkl_file.save(pkl_path)
@@ -139,28 +141,56 @@ def analyze():
 
             try:
                 feature_cols = clf.feature_names_in_.tolist()
+                missing_feats = [f for f in feature_cols if f not in df.columns]
+                if missing_feats:
+                    return jsonify({'success': False, 'error': f"Model expects these columns: {missing_feats}"})
+                X = df[feature_cols]
             except AttributeError:
-                feature_cols = [c for c in df.columns if c not in [label_col]]
-    
-            X = df[feature_cols].select_dtypes(include=[np.number])
+                X = df.drop(columns=[label_col], errors='ignore').select_dtypes(include=[np.number])
+
+            X = X.apply(lambda col: pd.Categorical(col).codes if col.dtype == object else col)
+            X = X.fillna(X.median())
+            
             preds = clf.predict(X)
             df['_prediction'] = preds
             predictions_col = '_prediction'
             model_used = True
 
-        elif pred_col and pred_col in df.columns:
-            # Use existing prediction column in CSV
-            df[pred_col] = pd.to_numeric(df[pred_col], errors='coerce')
-            predictions_col = pred_col
-        
-        # ── 7. Drop rows with NaN in key columns ─────────────────────────────
-        key_cols = [sensitive_attr, label_col]
-        if predictions_col:
-            key_cols.append(predictions_col)
-        df = df.dropna(subset=key_cols)
-
-        if len(df) < 10:
-            return jsonify({'success': False, 'error': 'Not enough valid rows after cleaning. Check your data.'})
+            # ── SHAP CHART GENERATION ──
+            try:
+                # 1. Sample data for speed (SHAP is heavy)
+                X_sample = X.sample(n=min(150, len(X)), random_state=42)
+                
+                # 2. Style Matplotlib for Dark Mode!
+                plt.style.use('dark_background')
+                plt.rcParams.update({
+                    'axes.facecolor': 'none', 'figure.facecolor': 'none',
+                    'text.color': '#c0c0d8', 'axes.labelcolor': '#c0c0d8',
+                    'xtick.color': '#6b6b8a', 'ytick.color': '#6b6b8a',
+                    'axes.edgecolor': '#2a2a40', 'axes.spines.top': False, 'axes.spines.right': False
+                })
+                
+                # 3. Generate SHAP values
+                explainer = shap.Explainer(clf, X_sample)
+                shap_values = explainer(X_sample)
+                
+                plt.figure(figsize=(7, 4.5))
+                
+                # Handle different model output shapes (binary vs continuous)
+                if len(shap_values.shape) == 3:
+                    shap.summary_plot(shap_values[:, :, 1], X_sample, show=False, plot_size=(7, 4.5))
+                else:
+                    shap.summary_plot(shap_values, X_sample, show=False, plot_size=(7, 4.5))
+                    
+                # 4. Save to base64 string
+                fig = plt.gcf()
+                buf = BytesIO()
+                fig.savefig(buf, format="png", bbox_inches='tight', transparent=True, dpi=120)
+                plt.close(fig)
+                shap_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            except Exception as e:
+                print(f"SHAP generation failed (this is okay, skipping plot): {e}")
+                shap_base64 = None
 
         # ── 8. Build AIF360 dataset ──────────────────────────────────────────
         unfav_label = 1 - favorable_label
@@ -196,14 +226,24 @@ def analyze():
         pred_parity_diff = None
 
         if predictions_col:
-            pred_df = df[[sensitive_attr, predictions_col]].copy()
-            pred_df.columns = [sensitive_attr, label_col]
+            # 1. Keep sensitive attr, predictions, AND the weights column if it exists
+            cols_to_keep = [sensitive_attr, predictions_col]
+            if weights_col:
+                cols_to_keep.append(weights_col)
+                
+            pred_df = df[cols_to_keep].copy()
+            
+            # 2. Rename the predictions column to match the label column name (required by AIF360)
+            pred_df = pred_df.rename(columns={predictions_col: label_col})
+            
+            # 3. Create the Prediction Dataset, making sure to pass the weights!
             pred_ds = BinaryLabelDataset(
                 df=pred_df,
                 label_names=[label_col],
                 protected_attribute_names=[sensitive_attr],
                 favorable_label=favorable_label,
-                unfavorable_label=unfav_label
+                unfavorable_label=unfav_label,
+                instance_weights_name=weights_col  # <--- THIS WAS MISSING
             )
             clf_metric = ClassificationMetric(
                 ground_truth_ds, pred_ds,
@@ -256,14 +296,17 @@ def analyze():
 Groups: {grp_str}
 Disparate Impact: {disparate_impact} (fair: 0.8–1.2)
 Statistical Parity: {stat_parity} (fair: -0.1–0.1)
+{"Model Predictions also analyzed — Equal Opportunity Difference: " + str(eq_odds_diff) + ", Average Odds Difference: " + str(avg_odds_diff) if model_used else ""}
 
 Give:
 1. Verdict (biased or not)
 2. Disadvantaged group + how much
-3. Severity: Low/Medium/High
+3. {"Both dataset bias AND model prediction bias — are they consistent or does the model make it worse?" if model_used else "Severity: Low/Medium/High"}
 4. 2 specific fixes
 
-Max 150 words. Be direct. Do not introduce yourself. Do not use any markdown formatting like ** or *."""
+{"Also explain what Equal Opportunity Difference and Average Odds Difference mean for this specific model." if model_used else ""}
+
+Max 180 words. Be direct. Do not introduce yourself. Plain text only, no markdown."""
         
         gemini_resp = client.models.generate_content(
             model='gemini-3.1-pro-preview', 
@@ -284,10 +327,11 @@ Max 150 words. Be direct. Do not introduce yourself. Do not use any markdown for
             'explanation': explanation,
             'sensitive_attr': sensitive_attr,
             'label_col': label_col,
-            'favorable_label': favorable_label, # <--- NEW
+            'favorable_label': favorable_label,
             'group_stats': group_stats,
             'model_used': model_used,
-            'row_count': len(df)
+            'row_count': len(df),
+            'shap_plot': shap_base64  # <--- ADD THIS LINE
         })
 
     except Exception as e:

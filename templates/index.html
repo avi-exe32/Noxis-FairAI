@@ -902,6 +902,35 @@
             line-height: 1.6;
             text-align: left;
         }
+
+        .shap-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            display: none; /* Hidden until loaded */
+            text-align: center;
+            animation: fadeUp 0.5s forwards;
+        }
+        .shap-card h3 {
+            font-size: 13px;
+            font-family: 'Space Mono', monospace;
+            color: var(--accent2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .shap-card p.shap-desc {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+        .shap-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -989,6 +1018,12 @@
 <div class="loading" id="loading">
     <div class="loader-ring"></div>
     <p id="loadingMsg">Running fairness audit...</p>
+</div>
+
+<div class="shap-card" id="shapCard">
+    <h3>Model Feature Importance (SHAP)</h3>
+    <p class="shap-desc">Features at the top drove the model's decisions the most. Watch out if your sensitive attribute is high on this list.</p>
+    <img id="shapImg" class="shap-img" alt="SHAP Summary Plot">
 </div>
 
 <!-- Results -->
@@ -1202,7 +1237,7 @@
             <span class="meta-pill">📊 ${data.row_count} rows</span>
             <span class="meta-pill">🔑 ${data.sensitive_attr}</span>
             <span class="meta-pill">🎯 ${data.label_col}</span>
-            ${data.model_used ? '<span class="meta-pill">🤖 Model uploaded</span>' : ''}
+            ${data.model_used ? '<span class="meta-pill" style="border-color:rgba(168,85,247,0.4);color:var(--accent)">🤖 Model predictions analyzed</span>' : '<span class="meta-pill">📋 Dataset-level audit</span>'}
         `;
 
         // Verdict
@@ -1273,6 +1308,52 @@
 
         // Gemini explanation
         document.getElementById('explanationText').textContent = data.explanation;
+        // Show model vs dataset comparison if model was used
+        const explanationCard = document.getElementById('explanationText').parentElement.parentElement;
+        if (data.model_used && data.eq_odds_diff !== null) {
+            const existing = document.getElementById('modelReportBanner');
+            if (!existing) {
+                const banner = document.createElement('div');
+                banner.id = 'modelReportBanner';
+                banner.style.cssText = `
+                    background: rgba(168,85,247,0.08);
+                    border: 1px solid rgba(168,85,247,0.2);
+                    border-radius: 12px;
+                    padding: 16px 20px;
+                    margin-bottom: 14px;
+                    font-size: 13px;
+                    color: #c0c0d8;
+                    line-height: 1.8;
+                `;
+                const eqOdds = data.eq_odds_diff;
+                const avgOdds = data.avg_odds_diff;
+                const modelFair = Math.abs(eqOdds) <= 0.1 && Math.abs(avgOdds) <= 0.1;
+                banner.innerHTML = `
+                    <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:10px;letter-spacing:1px">
+                        🤖 MODEL PREDICTION AUDIT
+                    </div>
+                    Your trained model was run on this dataset and its predictions were audited separately from the ground truth labels.
+                    <br><br>
+                    Equal Opportunity Difference: <strong style="color:${Math.abs(eqOdds)<=0.1?'var(--good)':'var(--bad)'}">${eqOdds}</strong> — 
+                    ${Math.abs(eqOdds)<=0.1 ? 'model gives equal true positive rates across groups ✓' : 'model favors one group when making correct positive predictions ⚠'}
+                    <br>
+                    Average Odds Difference: <strong style="color:${Math.abs(avgOdds)<=0.1?'var(--good)':'var(--bad)'}">${avgOdds}</strong> — 
+                    ${Math.abs(avgOdds)<=0.1 ? 'model errors are balanced across groups ✓' : 'model makes more errors for one group ⚠'}
+                    <br><br>
+                    <strong>Overall model verdict: ${modelFair ? '✅ Your model predictions are fair' : '⚠ Your model predictions show bias beyond the dataset'}</strong>
+                `;
+                explanationCard.parentElement.insertBefore(banner, explanationCard);
+            }
+        }
+
+            // SHAP Chart Rendering
+        const shapCard = document.getElementById('shapCard');
+        if (data.shap_plot) {
+            document.getElementById('shapImg').src = 'data:image/png;base64,' + data.shap_plot;
+            shapCard.style.display = 'block';
+        } else {
+            shapCard.style.display = 'none';
+        }
 
         document.getElementById('results').style.display = 'block';
         document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
