@@ -5,6 +5,11 @@ import pandas as pd
 import numpy as np
 import os
 import pickle
+import tempfile
+
+# Suppress oneDNN optimization warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 import google.genai as genai
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
@@ -18,7 +23,6 @@ from io import BytesIO
 import time
 import re
 from flask import abort
-from google.cloud import aiplatform
 
 
 load_dotenv()
@@ -91,8 +95,12 @@ def analyze():
             return jsonify({'success': False, 'error': 'No CSV file uploaded.'})
 
         csv_filename = 'dataset.csv'
-        csv_file.save(os.path.join('/tmp', csv_filename))
-        df = pd.read_csv(os.path.join('/tmp', csv_filename))
+        temp_dir = tempfile.gettempdir()
+        csv_file.save(os.path.join(temp_dir, csv_filename))
+        df = pd.read_csv(os.path.join(temp_dir, csv_filename))
+        
+        # Sanitize column names - remove quotes and strip whitespace
+        df.columns = [c.strip().replace('"', '').replace("'", "") for c in df.columns]
 
         # ── 3. Validate required columns ────────────────────────────────────
         missing = [c for c in [sensitive_attr, label_col] if c not in df.columns]
@@ -101,21 +109,20 @@ def analyze():
                             'error': f"Column(s) not found in CSV: {', '.join(missing)}. "
                                      f"Available columns: {', '.join(df.columns.tolist())}"})
 
-        # ── 4. Encode sensitive attribute to 0/1 if not already numeric ─────
+        # ── 4. Encode sensitive attribute (Multi-class support) ─────────────
         sa_series = df[sensitive_attr]
-        if sa_series.dtype == object or str(sa_series.dtype) == 'category':
-            unique_vals = sa_series.unique().tolist()
-            if len(unique_vals) != 2:
-                return jsonify({'success': False,
-                                'error': f"Sensitive attribute '{sensitive_attr}' must have exactly 2 unique values "
-                                         f"(found: {unique_vals})."})
-            mapping = {unique_vals[0]: 0, unique_vals[1]: 1}
-            df[sensitive_attr] = sa_series.map(mapping)
-            group_names = {'0': str(unique_vals[0]), '1': str(unique_vals[1])}
-        else:
-            df[sensitive_attr] = pd.to_numeric(sa_series, errors='coerce')
-            unique_vals = df[sensitive_attr].dropna().unique().tolist()
-            group_names = {'0': '0', '1': '1'}
+        unique_vals = sa_series.unique().tolist()
+        
+        # Get privileged value from HTML form (user specifies which group is privileged)
+        privileged_val = request.form.get('privileged_val', '').strip()
+        
+        # If not specified or invalid, use first unique value as fallback
+        if not privileged_val or str(privileged_val) not in [str(v) for v in unique_vals]:
+            privileged_val = str(unique_vals[0])
+        
+        # Map: Privileged value = 1, EVERYTHING ELSE = 0
+        df[sensitive_attr] = sa_series.apply(lambda x: 1 if str(x) == str(privileged_val) else 0)
+        group_names = {'1': str(privileged_val), '0': 'Other Groups'}
 
         # ── 5. Encode label column to numeric ───────────────────────────────
         lbl_series = df[label_col]
@@ -138,8 +145,9 @@ def analyze():
 
         if pkl_file and pkl_file.filename != '':
             pkl_filename = 'model.pkl'
-            pkl_file.save(os.path.join('/tmp', pkl_filename))
-            clf = pickle.load(open(os.path.join('/tmp', pkl_filename), 'rb'))
+            temp_dir = tempfile.gettempdir()
+            pkl_file.save(os.path.join(temp_dir, pkl_filename))
+            clf = pickle.load(open(os.path.join(temp_dir, pkl_filename), 'rb'))
 
             # One-hot encode the uploaded dataset just like the training script
             X_raw = df.drop(columns=[label_col], errors='ignore')
@@ -319,6 +327,9 @@ Max 180 words. Be direct. Do not introduce yourself. Plain text only, no markdow
         # Strip out the markdown stars
         explanation = gemini_resp.text.replace("**", "").replace("*", "")
 
+        if len(explanation) > 5000:
+            explanation = explanation[:5000] + "... [Truncated for size]"
+
         return jsonify({
            'grade': grade,
             'grade_score': grade_score,
@@ -340,11 +351,7 @@ Max 180 words. Be direct. Do not introduce yourself. Plain text only, no markdow
 
     except Exception as e:
         import traceback
-        # Just before the 'return jsonify'
-    if len(explanation) > 5000:
-        explanation = explanation[:5000] + "... [Truncated for size]"
-        
-    return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -411,8 +418,8 @@ Dataset Context:
 - Current Disparate Impact: {di}
 
 The Python script must strictly follow these steps to avoid AIF360 errors:
-1. Import pandas and required AIF360 modules (BinaryLabelDataset, Reweighing).
-2. Load a file named '/tmp/dataset.csv' using pandas.
+1. Import pandas, tempfile, and required AIF360 modules (BinaryLabelDataset, Reweighing).
+2. Use tempfile.gettempdir() to find the system temp folder, then load the file at that path with 'dataset.csv' filename.
 3. Replace '?' strings with pandas NA and drop missing values.
 4. If '{attr}' or '{label}' are text/strings, map them to 0 and 1.
 5. Use pd.get_dummies(drop_first=True) on the dataframe to convert all remaining text columns to numbers.
@@ -420,7 +427,7 @@ The Python script must strictly follow these steps to avoid AIF360 errors:
 7. Convert the dataframe into an AIF360 BinaryLabelDataset.
 8. Apply the Reweighing algorithm.
 9. Extract the newly calculated instance weights and add them as a new column 'fair_weights'.
-10. Save the mitigated dataframe to '/tmp/mitigated_dataset.csv'.
+10. Save the mitigated dataframe to the temp folder as 'mitigated_dataset.csv' (use os.path.join(tempfile.gettempdir(), 'mitigated_dataset.csv')).
 
 IMPORTANT: Reply ONLY with valid, well-commented Python code. 
 Do not use Markdown formatting like ```python or ```. Do not add any conversational text before or after the code.
@@ -452,7 +459,8 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
 
 @app.route('/download-mitigated')
 def download_mitigated():
-    path = '/tmp/mitigated_dataset.csv'
+    temp_dir = tempfile.gettempdir()
+    path = os.path.join(temp_dir, 'mitigated_dataset.csv')
     if os.path.exists(path):
         return send_file(path, as_attachment=True)
     else:

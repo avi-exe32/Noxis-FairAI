@@ -1170,6 +1170,19 @@
             border-bottom: 1px solid var(--border);
         }
         .section-label:first-child { margin-top: 0; }
+
+        .select-custom {
+            background-color: #07070d;
+            color: #c0c0d8;
+            border: 1px solid #2a2a40;
+            transition: border-color 0.3s ease;
+        }
+        .select-custom:focus {
+            background-color: #07070d;
+            color: #fff;
+            border-color: #a855f7;
+            box-shadow: 0 0 0 3px rgba(168,85,247,0.1);
+        }
     </style>
 </head>
 <body>
@@ -1201,8 +1214,8 @@
 
             <div class="form-group">
                 <label>Upload CSV File</label>
-                <div class="upload-zone" id="csvZone" onclick="document.getElementById('csvInput').click()">
-                    <input type="file" id="csvInput" accept=".csv" onchange="handleCSV(this)">
+                <div class="upload-zone" id="csvZone" onclick="document.getElementById('dataset_input').click()">
+                    <input type="file" id="dataset_input" accept=".csv" onchange="handleCSV(this)">
                     <div class="upload-icon">📊</div>
                     <div class="upload-text">
                         <div class="upload-label"><strong>Click to upload</strong> or drag & drop your dataset</div>
@@ -1220,12 +1233,32 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Sensitive Attribute Column</label>
-                    <input type="text" id="sensitiveAttr" placeholder="e.g. gender, race, age">
+                    <select id="sa_dropdown" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; cursor: pointer;">
+                        <option value="">Upload CSV first...</option>
+                    </select>
                     <div class="hint">The protected attribute to audit</div>
                 </div>
                 <div class="form-group">
+                    <label>Privileged Value</label>
+                    <select id="pv_dropdown" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; cursor: pointer;">
+                        <option value="">Select Attribute first...</option>
+                    </select>
+                    <div class="hint">Which value represents the advantaged group?</div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
                     <label>Target Label Column</label>
-                    <input type="text" id="labelCol" placeholder="e.g. loan_approved, hired">
+                    <select id="lc_dropdown" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; cursor: pointer;">
+                        <option value="">Upload CSV first...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Existing Prediction Column (Optional)</label>
+                    <select id="pc_dropdown" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; cursor: pointer;">
+                        <option value="">-- None --</option>
+                    </select>
                 </div>
             </div>
 
@@ -1237,15 +1270,9 @@
                 </select>
             </div>
 
-            <!-- Model upload (not optional, just collapsible) -->
-            <div class="optional-toggle" id="optToggle" onclick="toggleOptional()">
-                <span>⚙ Upload trained model or provide prediction column</span>
-                <span class="chevron">▼</span>
-            </div>
-
-            <div class="optional-section" id="optSection">
-
-                <div class="card-section-title" style="margin-top:16px">02 — Model / Predictions</div>
+            <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);">
+                <div class="card-section-title">02 — Model / Predictions (Optional)</div>
+                <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.6;">Upload your trained .pkl model to audit its predictions for bias. Or skip this if you only want to audit the dataset itself.</p>
 
                 <div class="form-group">
                     <label>Trained Model File (.pkl)</label>
@@ -1443,6 +1470,20 @@
             </div>
         </div>
 
+        <div class="strategy-card" id="fixedAssetsCard" style="display: none; margin-top: 14px; background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.3);">
+            <div class="strategy-header">
+                <div class="strategy-dot" style="background: var(--good); box-shadow: 0 0 8px var(--good);"></div>
+                <span style="color: var(--good);">Download Mitigated Assets</span>
+            </div>
+            <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">
+                Don't have time to run the script locally? Download the pre-processed fair dataset and the retrained model to test them in Noxis.
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="/static/fixed_dataset.csv" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">📥 Fixed Dataset</a>
+                <a href="/static/fixed_model.pkl" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">🤖 Fair Model</a>
+            </div>
+        </div>
+
         <div class="section-label">Feature Importance (SHAP)</div>
 
         <!-- SHAP Chart -->
@@ -1514,17 +1555,19 @@
     async function analyze() {
         hideError();
         if (!csvFile) return showError('Please upload a CSV file.');
-        const sensitiveAttr = document.getElementById('sensitiveAttr').value.trim();
-        const labelCol = document.getElementById('labelCol').value.trim();
-        if (!sensitiveAttr || !labelCol) return showError('Please fill in Sensitive Attribute and Target Label fields.');
+        const sensitiveAttr = document.getElementById('sa_dropdown').value.trim();
+        const labelCol = document.getElementById('lc_dropdown').value.trim();
+        const privilegedVal = document.getElementById('pv_dropdown').value.trim();
+        if (!sensitiveAttr || !labelCol || !privilegedVal) return showError('Please select Sensitive Attribute, Privileged Value, and Target Label.');
 
         const formData = new FormData();
         formData.append('dataset', csvFile);
         formData.append('sensitive_attr', sensitiveAttr);
         formData.append('label_col', labelCol);
         formData.append('favorable_label', document.getElementById('favorableLabel').value);
+        formData.append('privileged_val', privilegedVal);
 
-        const predCol = document.getElementById('predCol').value.trim();
+        const predCol = document.getElementById('pc_dropdown').value.trim();
         if (predCol) formData.append('pred_col', predCol);
         if (modelFile) formData.append('model', modelFile);
 
@@ -1839,6 +1882,8 @@ async function generateStrategy() {
             // Put the text in the code tag instead of standard text
             document.getElementById('strategyCode').textContent = data.strategy;
             card.style.display = 'block';
+            // Add this line to show the download buttons!
+            document.getElementById('fixedAssetsCard').style.display = 'block';
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
             btn.textContent = '⚡ Regenerate Script';
             btn.disabled = false;
@@ -1902,6 +1947,75 @@ function downloadSamples(event) {
         }, index * 300); // 300ms gap between downloads
     });
 }
+
+// Auto-detect CSV columns and populate dropdowns
+document.getElementById('dataset_input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const headerLine = text.split('\n')[0];
+        const headers = headerLine.split(',').map(h => h.trim().replace(/['"]/g, ''));
+
+        const sa = document.getElementById('sa_dropdown');
+        const lc = document.getElementById('lc_dropdown');
+        const pc = document.getElementById('pc_dropdown');
+
+        [sa, lc, pc].forEach(d => d.innerHTML = '<option value="">-- Select --</option>');
+
+        headers.forEach(col => {
+            const opt = () => {
+                const o = document.createElement('option');
+                o.value = col;
+                o.textContent = col;
+                return o;
+            };
+            
+            sa.appendChild(opt());
+            lc.appendChild(opt());
+            pc.appendChild(opt());
+        });
+    };
+    reader.readAsText(file.slice(0, 5000));
+});
+
+// Update Privileged Value dropdown when Sensitive Attribute changes
+document.getElementById('sa_dropdown').addEventListener('change', function() {
+    const file = csvFile;
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        const headerLine = lines[0];
+        const headers = headerLine.split(',').map(h => h.trim().replace(/['"]/g, ''));
+        
+        const colIndex = headers.indexOf(document.getElementById('sa_dropdown').value);
+        if (colIndex === -1) return;
+
+        const uniqueValues = [...new Set(lines.slice(1)
+            .map(line => {
+                const cols = line.split(',').map(c => c.trim().replace(/['"]/g, ''));
+                return cols[colIndex];
+            })
+            .filter(v => v && v.length > 0)
+        )];
+
+        const pvDropdown = document.getElementById('pv_dropdown');
+        pvDropdown.innerHTML = '<option value="">-- Select Value --</option>';
+
+        uniqueValues.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val;
+            pvDropdown.appendChild(opt);
+        });
+    };
+    reader.readAsText(file);
+});
 
 </script>
 </body>
