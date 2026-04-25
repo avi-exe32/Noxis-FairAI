@@ -1205,6 +1205,11 @@
                         <div class="upload-label"><strong>Click to upload</strong> or drag & drop your dataset</div>
                         <div class="upload-sub">.csv files only</div>
                         <div id="csvBadge" class="file-badge"></div>
+                        <div style="margin-top: 16px; position: relative; z-index: 10;">
+                            <button type="button" onclick="downloadSamples(event)" style="background: rgba(221, 19, 103, 0.1); border: 1px solid var(--accent2); color: var(--accent2); padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                                📥 Download Sample CSV & Model
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1868,6 +1873,30 @@ function exportPDF() {
         // Put the scrolling back to normal after the PDF downloads
         element.style.height = originalHeight;
         element.style.overflowY = originalOverflow;
+    });
+}
+
+function downloadSamples(event) {
+    // Prevent the click from opening the upload file explorer
+    event.preventDefault(); 
+    event.stopPropagation();
+
+    // The exact files from your static folder
+    const files = [
+        '/static/biased_dataset.csv',
+        '/static/test_model.pkl'
+    ];
+
+    // Download them with a tiny delay so the browser doesn't block it
+    files.forEach((file, index) => {
+        setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = file;
+            a.download = file.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }, index * 300); // 300ms gap between downloads
     });
 }
 

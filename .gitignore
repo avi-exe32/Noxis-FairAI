@@ -28,3 +28,6 @@ uploads/
 # Project specific
 archive/
 archive.zip
+
+!static/*.csv
+!static/*.pkl
