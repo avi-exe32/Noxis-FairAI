@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import os
 from flask import send_from_directory
 import pandas as pd
@@ -24,9 +24,28 @@ import time
 import re
 from flask import abort
 
+import firebase_admin
+from firebase_admin import credentials, firestore
+import json
+
+# Initialize Firebase
+if os.environ.get('FIREBASE_CONFIG_JSON'):
+    config_dict = json.loads(os.environ.get('FIREBASE_CONFIG_JSON'))
+    cred = credentials.Certificate(config_dict)
+else:
+    cred = credentials.Certificate("fb-key.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
 
 load_dotenv()
 app = Flask(__name__)
+
+client = genai.Client(
+    vertexai=True, 
+    project='noxis2',      # Make sure this matches your new project ID
+    location='global' 
+)
 
 client = genai.Client(
     vertexai=True, 
@@ -399,16 +418,15 @@ Answer the user's question about this audit in max 100 words. Be direct. Do not 
 
 @app.route('/mitigate', methods=['POST'])
 def mitigate():
-    try:
-        data = request.get_json()
-        audit_context = data.get('context', {})
-        
-        attr = audit_context.get('sensitive_attr')
-        label = audit_context.get('label_col')
-        favorable_label = audit_context.get('favorable_label', 1)
-        di = audit_context.get('disparate_impact', 'Unknown')
+    data = request.get_json()
+    audit_context = data.get('context', {})
+    
+    attr = audit_context.get('sensitive_attr')
+    label = audit_context.get('label_col')
+    favorable_label = audit_context.get('favorable_label', 1)
+    di = audit_context.get('disparate_impact', 'Unknown')
 
-        prompt = f"""You are an AI fairness data engineer. 
+    prompt = f"""You are an AI fairness data engineer. 
 Write a complete, standalone Python script to mitigate bias in a CSV dataset using the `aif360` library.
 
 Dataset Context:
@@ -433,29 +451,35 @@ IMPORTANT: Reply ONLY with valid, well-commented Python code.
 Do not use Markdown formatting like ```python or ```. Do not add any conversational text before or after the code.
 """
 
-        for attempt in range(3):
-            try:
-                response = client.models.generate_content(
-                    model='gemini-3.1-pro-preview',
-                    contents=prompt
-                )
-                break
-            except Exception as e:
-                if '429' in str(e) and attempt < 2:
-                    time.sleep(10)
-                    continue
-                raise e
-        
-        clean_code = response.text
-        clean_code = re.sub(r'^```python\s*', '', clean_code, flags=re.IGNORECASE|re.MULTILINE)
-        clean_code = re.sub(r'^```\s*', '', clean_code, flags=re.MULTILINE)
-        clean_code = clean_code.strip()
-        
-        return jsonify({'success': True, 'strategy': clean_code})
+    def stream_response():
+        try:
+            # THIS IS THE MAGIC: True streaming directly from the SDK
+            response_stream = client.models.generate_content_stream(
+                model='gemini-3.1-pro-preview',
+                contents=prompt
+            )
+            
+            for chunk in response_stream:
+                if chunk.text:
+                    # Clean up any stubborn markdown ticks on the fly
+                    clean_text = chunk.text.replace("```python\n", "").replace("```python", "").replace("```", "")
+                    yield clean_text
+        except Exception as e:
+            yield f"\nERROR: {str(e)}"
+    
+    return Response(stream_response(), mimetype='text/plain')
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/save_result', methods=['POST'])
+def save_result():
+    data = request.json
+    db.collection('audits').add({
+        'user_id': data['user_id'],
+        'di_score': data['di_score'],
+        'attribute': data['attribute'],
+        'timestamp': firestore.SERVER_TIMESTAMP
+    })
+    return {"status": "saved"}
 
 @app.route('/download-mitigated')
 def download_mitigated():

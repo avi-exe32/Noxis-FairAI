@@ -1183,6 +1183,24 @@
             border-color: #a855f7;
             box-shadow: 0 0 0 3px rgba(168,85,247,0.1);
         }
+
+        .login-google {
+            display: flex;
+            align-items: center;
+            background-color: white;
+            color: #757575;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .login-google:hover {
+            background-color: #f8f8f8;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -1193,6 +1211,19 @@
         <img src="/static/logo.png" alt="Noxis Logo" class="nav-logo">
     </a>
     <div class="nav-right">
+        <div id="auth-section">
+            <button id="login-btn" onclick="login()" class="login-google">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                     alt="G" 
+                     style="width: 18px; margin-right: 10px;">
+                Sign in with Google
+            </button>
+            <div id="user-info" style="display: none; align-items: center; gap: 10px;">
+                <span id="user-name" style="font-size: 14px; color: var(--muted);"></span>
+                <img id="user-pic" src="" style="width: 32px; border-radius: 50%; border: 1px solid var(--accent);">
+                <button onclick="logout()" style="background: none; border: none; color: #ff4444; cursor: pointer; font-size: 12px;">Logout</button>
+            </div>
+        </div>
         <div class="nav-tag">AI Fairness Audit</div>
     </div>
 </nav>
@@ -1495,6 +1526,13 @@
             </div>
         </div>
 
+        <div class="section-label">Audit History</div>
+        <div class="card" id="historyCard" style="background: var(--surface2); padding: 20px;">
+            <div id="history-list" style="display: flex; flex-direction: column; gap: 10px;">
+                <p style="color: var(--muted); font-size: 13px;">No past audits found. Run your first audit to see history.</p>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1619,6 +1657,16 @@
     function renderResults(data) {
         // Meta pills
         auditContext = data;
+
+        // Save to Firebase if logged in
+        console.log("About to save audit to history...");
+        console.log("Window has saveAuditToHistory:", typeof window.saveAuditToHistory);
+        if (typeof window.saveAuditToHistory === 'function') {
+            saveAuditToHistory(data.sensitive_attr, data.disparate_impact);
+        } else {
+            console.error("saveAuditToHistory function not found on window");
+        }
+
         // Grade circle
         const gradeEl = document.getElementById('gradeCircle');
         gradeEl.innerHTML = `
@@ -1862,11 +1910,13 @@ async function generateStrategy() {
     const btn = document.getElementById('mitigateBtn');
     const loading = document.getElementById('strategyLoading');
     const card = document.getElementById('strategyCard');
+    const codeEl = document.getElementById('strategyCode');
 
     btn.disabled = true;
     btn.textContent = 'Generating Script...';
     loading.style.display = 'block';
     card.style.display = 'none';
+    codeEl.textContent = '';
 
     try {
         const res = await fetch('/mitigate', {
@@ -1874,27 +1924,43 @@ async function generateStrategy() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ context: auditContext })
         });
-        const data = await res.json();
+        
+        if (!res.ok) {
+            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+        }
+        
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
         
         loading.style.display = 'none';
-
-        if (data.success) {
-            // Put the text in the code tag instead of standard text
-            document.getElementById('strategyCode').textContent = data.strategy;
-            card.style.display = 'block';
-            // Add this line to show the download buttons!
-            document.getElementById('fixedAssetsCard').style.display = 'block';
-            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            btn.textContent = '⚡ Regenerate Script';
+        card.style.display = 'block';
+        document.getElementById('fixedAssetsCard').style.display = 'block';
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        let fullText = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullText += chunk;
+            codeEl.textContent = fullText;
+        }
+        
+        if (fullText.startsWith('ERROR:')) {
+            alert('Error generating script: ' + fullText.substring(6));
+            loading.style.display = 'block';
+            card.style.display = 'none';
+            btn.textContent = '⚡ Generate Fix Strategy';
             btn.disabled = false;
         } else {
-            alert('Error: ' + data.error);
-            btn.textContent = '⚡ Generate Fix Strategy';
+            btn.textContent = '⚡ Regenerate Script';
             btn.disabled = false;
         }
     } catch (e) {
+        console.error('Stream error:', e);
         loading.style.display = 'none';
-        alert('Could not reach server.');
+        card.style.display = 'none';
+        alert('Error: ' + e.message);
         btn.textContent = '⚡ Generate Fix Strategy';
         btn.disabled = false;
     }
@@ -2018,5 +2084,150 @@ document.getElementById('sa_dropdown').addEventListener('change', function() {
 });
 
 </script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiUVSwyrM5YFXV3T43Y458TpzCn_BfbJA",
+    authDomain: "noxis2.firebaseapp.com",
+    projectId: "noxis2",
+    storageBucket: "noxis2.firebasestorage.app",
+    messagingSenderId: "278388103464",
+    appId: "1:278388103464:web:5ff900655499d61138d81d",
+    measurementId: "G-KC91GFKEGW"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Auth state listener
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      document.getElementById('login-btn').style.display = 'none';
+      document.getElementById('user-info').style.display = 'flex';
+      document.getElementById('user-name').textContent = user.displayName;
+      document.getElementById('user-pic').src = user.photoURL;
+      window.loadHistory(); // Load history when user logs in
+    } else {
+      document.getElementById('login-btn').style.display = 'inline-flex';
+      document.getElementById('user-info').style.display = 'none';
+      window.loadHistory(); // Also load history when user logs out (to show login message)
+    }
+  });
+
+  // Expose functions to the window so your buttons can click them
+  window.login = async () => {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    localStorage.setItem('user_id', result.user.uid);
+    location.reload(); 
+  };
+
+  window.logout = async () => {
+    await signOut(auth);
+    localStorage.removeItem('user_id');
+    location.reload();
+  };
+
+  window.saveAuditToHistory = async (attribute, score) => {
+    const user = auth.currentUser;
+    
+    if (user) {
+        try {
+            await addDoc(collection(db, "audits"), {
+                user_id: user.uid,
+                user_email: user.email,
+                attribute: attribute, // e.g., "race" or "gender"
+                di_score: score,
+                timestamp: serverTimestamp()
+            });
+            window.loadHistory(); // Refresh the list immediately
+        } catch (e) {
+            console.error("Error adding document: ", e);
+        }
+    }
+  };
+
+  window.loadHistory = async () => {
+    const user = auth.currentUser;
+    const container = document.getElementById('history-list');
+    
+    if (!user) {
+        container.innerHTML = '<p style="color: var(--muted); font-size: 13px;">Please log in to view your audit history.</p>';
+        return;
+    }
+
+    try {
+        // Try the indexed query first
+        const q = query(
+            collection(db, "audits"),
+            where("user_id", "==", user.uid),
+            orderBy("timestamp", "desc"),
+            limit(5)
+        );
+
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+            container.innerHTML = '<p style="color: var(--muted); font-size: 13px;">No past audits found. Run your first audit to see history.</p>';
+            return;
+        }
+
+        container.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            const date = data.timestamp?.toDate().toLocaleDateString() || "Just now";
+            
+            container.innerHTML += `
+                <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border); font-size: 13px;">
+                    <span><strong>${data.attribute}</strong></span>
+                    <span style="color: var(--accent2)">DI Score: ${data.di_score}</span>
+                    <span style="color: var(--muted)">${date}</span>
+                </div>
+            `;
+        });
+    } catch (error) {
+        // Fallback: Get all audits and filter/sort in JavaScript
+        const q2 = query(collection(db, "audits"), where("user_id", "==", user.uid));
+        const querySnapshot2 = await getDocs(q2);
+        
+        const audits = [];
+        querySnapshot2.forEach((doc) => {
+            const data = doc.data();
+            audits.push({
+                attribute: data.attribute,
+                di_score: data.di_score,
+                timestamp: data.timestamp
+            });
+        });
+        
+        // Sort by timestamp descending and take first 5
+        audits.sort((a, b) => b.timestamp?.toMillis() - a.timestamp?.toMillis());
+        const recentAudits = audits.slice(0, 5);
+        
+        if (recentAudits.length === 0) {
+            container.innerHTML = '<p style="color: var(--muted); font-size: 13px;">No past audits found. Run your first audit to see history.</p>';
+            return;
+        }
+
+        container.innerHTML = "";
+        recentAudits.forEach((audit) => {
+            const date = audit.timestamp?.toDate().toLocaleDateString() || "Just now";
+            container.innerHTML += `
+                <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border); font-size: 13px;">
+                    <span><strong>${audit.attribute}</strong></span>
+                    <span style="color: var(--accent2)">DI Score: ${audit.di_score}</span>
+                    <span style="color: var(--muted)">${date}</span>
+                </div>
+            `;
+        });
+    }
+  };
+</script>
+
 </body>
 </html>

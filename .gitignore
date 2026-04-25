@@ -30,3 +30,9 @@ archive.zip
 !static/*.csv
 !static/*.pkl
 !static/*.png
+
+# Firebase Secret Key
+fb-key.json
+
+# Environment files
+.env
