@@ -442,7 +442,7 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
 
 import os
 
-from flask import send_from_path
+from flask import send_from_directory
 
 @app.route('/download-mitigated')
 def download_mitigated():
