@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file
+import os
+from flask import send_from_directory
 import pandas as pd
 import numpy as np
 import os
@@ -15,6 +17,7 @@ import base64
 from io import BytesIO
 import time
 import re
+from flask import abort
 
 load_dotenv()
 app = Flask(__name__)
@@ -440,14 +443,14 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-import os
-
-from flask import send_from_directory
 
 @app.route('/download-mitigated')
 def download_mitigated():
-    # This is the safer way to send the file from the cloud's temp folder
-    return send_file('/tmp/mitigated_dataset.csv', as_attachment=True)
+    path = '/tmp/mitigated_dataset.csv'
+    if os.path.exists(path):
+        return send_file(path, as_attachment=True)
+    else:
+        return "File not found. Please process the data first.", 404
 
 if __name__ == '__main__':
     # Cloud Run provides the PORT environment variable. Default to 8080 if running locally.
