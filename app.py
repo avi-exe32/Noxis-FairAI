@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import os
 import pickle
+import google.genai as genai
 from google import genai
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
@@ -90,7 +91,9 @@ def analyze():
         if not csv_file or csv_file.filename == '':
             return jsonify({'success': False, 'error': 'No CSV file uploaded.'})
 
-        df = pd.read_csv(csv_file)
+        csv_filename = 'dataset.csv'
+        csv_file.save(os.path.join('/tmp', csv_filename))
+        df = pd.read_csv(os.path.join('/tmp', csv_filename))
 
         # ── 3. Validate required columns ────────────────────────────────────
         missing = [c for c in [sensitive_attr, label_col] if c not in df.columns]
@@ -135,7 +138,9 @@ def analyze():
         shap_base64 = None
 
         if pkl_file and pkl_file.filename != '':
-            clf = pickle.load(pkl_file)
+            pkl_filename = 'model.pkl'
+            pkl_file.save(os.path.join('/tmp', pkl_filename))
+            clf = pickle.load(open(os.path.join('/tmp', pkl_filename), 'rb'))
 
             # One-hot encode the uploaded dataset just like the training script
             X_raw = df.drop(columns=[label_col], errors='ignore')
@@ -408,7 +413,7 @@ Dataset Context:
 
 The Python script must strictly follow these steps to avoid AIF360 errors:
 1. Import pandas and required AIF360 modules (BinaryLabelDataset, Reweighing).
-2. Load a file named 'dataset.csv' using pandas.
+2. Load a file named '/tmp/dataset.csv' using pandas.
 3. Replace '?' strings with pandas NA and drop missing values.
 4. If '{attr}' or '{label}' are text/strings, map them to 0 and 1.
 5. Use pd.get_dummies(drop_first=True) on the dataframe to convert all remaining text columns to numbers.

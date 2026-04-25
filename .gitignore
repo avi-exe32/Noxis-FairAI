@@ -18,7 +18,6 @@ __pycache__/
 *$py.class
 
 # Data & Uploads
-uploads/
 *.csv
 *.pkl
 *.xlsx
