@@ -1,6 +1,10 @@
 flask
-gunicorn
 pandas
+numpy
+google-genai
+google-cloud-aiplatform
 aif360
-fairlearn
-tensorflow
+python-dotenv
+shap
+matplotlib
+scikit-learn

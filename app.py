@@ -18,6 +18,8 @@ from io import BytesIO
 import time
 import re
 from flask import abort
+from google.cloud import aiplatform
+
 
 load_dotenv()
 app = Flask(__name__)
