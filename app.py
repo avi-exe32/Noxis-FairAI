@@ -18,8 +18,6 @@ import re
 
 load_dotenv()
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-os.makedirs('uploads', exist_ok=True)
 
 client = genai.Client(
     vertexai=True, 
@@ -82,13 +80,12 @@ def analyze():
             return jsonify({'success': False, 'error': 'Sensitive attribute and label column are required.'})
 
         # ── 2. Load CSV ─────────────────────────────────────────────────────
+        # ── 2. Load CSV directly from memory ────────────────────────────────
         csv_file = request.files.get('dataset')
         if not csv_file or csv_file.filename == '':
             return jsonify({'success': False, 'error': 'No CSV file uploaded.'})
 
-        csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
-        csv_file.save(csv_path)
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_file)
 
         # ── 3. Validate required columns ────────────────────────────────────
         missing = [c for c in [sensitive_attr, label_col] if c not in df.columns]
@@ -133,23 +130,21 @@ def analyze():
         shap_base64 = None
 
         if pkl_file and pkl_file.filename != '':
-            pkl_path = os.path.join(app.config['UPLOAD_FOLDER'], pkl_file.filename)
-            pkl_file.save(pkl_path)
+            clf = pickle.load(pkl_file)
 
-            with open(pkl_path, 'rb') as f:
-                clf = pickle.load(f)
-
-            try:
-                feature_cols = clf.feature_names_in_.tolist()
-                missing_feats = [f for f in feature_cols if f not in df.columns]
-                if missing_feats:
-                    return jsonify({'success': False, 'error': f"Model expects these columns: {missing_feats}"})
-                X = df[feature_cols]
-            except AttributeError:
-                X = df.drop(columns=[label_col], errors='ignore').select_dtypes(include=[np.number])
-
-            X = X.apply(lambda col: pd.Categorical(col).codes if col.dtype == object else col)
-            X = X.fillna(X.median())
+            # One-hot encode the uploaded dataset just like the training script
+            X_raw = df.drop(columns=[label_col], errors='ignore')
+            X_dummies = pd.get_dummies(X_raw, drop_first=True)
+            
+            # Align the columns perfectly with what the model expects, filling missing ones with 0
+            if hasattr(clf, 'feature_names_in_'):
+                expected_cols = clf.feature_names_in_
+                X = X_dummies.reindex(columns=expected_cols, fill_value=0)
+            else:
+                X = X_dummies.select_dtypes(include=[np.number])
+                
+            X = X.fillna(0)
+            X = X.astype(float)
             
             preds = clf.predict(X)
             df['_prediction'] = preds
@@ -393,25 +388,26 @@ def mitigate():
         favorable_label = audit_context.get('favorable_label', 1)
         di = audit_context.get('disparate_impact', 'Unknown')
 
-        # Overhaul prompt to strictly generate a Python script
         prompt = f"""You are an AI fairness data engineer. 
 Write a complete, standalone Python script to mitigate bias in a CSV dataset using the `aif360` library.
 
 Dataset Context:
-- Sensitive Attribute: '{attr}' (assumed binary 0/1, where 1 is privileged)
+- Sensitive Attribute: '{attr}'
 - Target Label: '{label}'
 - Favorable Outcome Value: {favorable_label}
 - Current Disparate Impact: {di}
 
-The Python script must:
+The Python script must strictly follow these steps to avoid AIF360 errors:
 1. Import pandas and required AIF360 modules (BinaryLabelDataset, Reweighing).
 2. Load a file named 'dataset.csv' using pandas.
-3. Drop missing values in the key columns.
-4. Convert the dataframe into an AIF360 BinaryLabelDataset.
-5. Apply the Reweighing algorithm.
-6. Extract the newly calculated instance weights.
-7. Add these weights as a new column 'fair_weights' to the pandas dataframe.
-8. Save the mitigated dataframe to a new file named 'mitigated_dataset.csv'.
+3. Replace '?' strings with pandas NA and drop missing values.
+4. If '{attr}' or '{label}' are text/strings, map them to 0 and 1.
+5. Use pd.get_dummies(drop_first=True) on the dataframe to convert all remaining text columns to numbers.
+6. Force the entire dataframe to float using df = df.astype(float).
+7. Convert the dataframe into an AIF360 BinaryLabelDataset.
+8. Apply the Reweighing algorithm.
+9. Extract the newly calculated instance weights and add them as a new column 'fair_weights'.
+10. Save the mitigated dataframe to a new file named 'mitigated_dataset.csv'.
 
 IMPORTANT: Reply ONLY with valid, well-commented Python code. 
 Do not use Markdown formatting like ```python or ```. Do not add any conversational text before or after the code.
@@ -430,7 +426,6 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
                     continue
                 raise e
         
-        # Clean up in case Gemini still uses markdown codeblocks
         clean_code = response.text
         clean_code = re.sub(r'^```python\s*', '', clean_code, flags=re.IGNORECASE|re.MULTILINE)
         clean_code = re.sub(r'^```\s*', '', clean_code, flags=re.MULTILINE)
@@ -441,5 +436,9 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+import os
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Cloud Run provides the PORT environment variable. Default to 8080 if running locally.
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)

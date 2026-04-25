@@ -10,8 +10,6 @@ instance/
 gcp-key.json
 *-key.json
 credentials.json
-# Be careful with *.json if you have legitimate config files, 
-# but for now, it's the safest way to prevent a leak.
 *.json 
 
 # Python temporary files
@@ -29,5 +27,7 @@ uploads/
 archive/
 archive.zip
 
+# MUST KEEP: Allow static sample files for the judges
 !static/*.csv
 !static/*.pkl
+!static/*.png

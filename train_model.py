@@ -3,8 +3,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 import pickle
 
-INPUT_CSV = "static/adult.csv" # Change to static/biased_dataset.csv if you moved it
-OUTPUT_MODEL = "static/test2_model.pkl"
+INPUT_CSV = "mitigated_dataset.csv" # Change to static/biased_dataset.csv if you moved it
+OUTPUT_MODEL = "static/test3_model.pkl"
 
 df = pd.read_csv(INPUT_CSV)
 
@@ -30,3 +30,8 @@ with open(OUTPUT_MODEL, 'wb') as f:
 
 print(f"✅ Success! Model saved as {OUTPUT_MODEL}")
 print(f"📊 Model Accuracy: {model.score(X_test, y_test) * 100:.1f}%")
+
+# Output for the model
+#✅ Success! Model saved as static/test2_model.pkl
+#📊 Model Accuracy: 84.2%
+#trained on a real dataset from kaggle
