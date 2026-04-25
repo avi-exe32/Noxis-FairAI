@@ -9,3 +9,7 @@ python-dotenv
 shap
 matplotlib
 scikit-learn
+tensorflow
+fairlearn
+inFairness
+

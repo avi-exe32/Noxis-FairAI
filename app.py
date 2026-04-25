@@ -6,7 +6,6 @@ import numpy as np
 import os
 import pickle
 import google.genai as genai
-from google import genai
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
 from dotenv import load_dotenv
