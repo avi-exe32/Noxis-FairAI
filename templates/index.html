@@ -489,6 +489,33 @@
             font-family: 'Space Mono', monospace;
         }
 
+        .progress-container {
+            width: 280px;
+            height: 6px;
+            background: var(--surface2);
+            border-radius: 10px;
+            margin: 24px auto 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #a855f7, #38bdf8);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-percent {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: var(--accent2);
+            font-weight: 700;
+            text-align: center;
+            margin-top: 4px;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
@@ -1399,6 +1426,10 @@
 <div class="loading" id="loading">
     <div class="loader-ring"></div>
     <p id="loadingMsg">Running fairness audit...</p>
+    <div class="progress-container">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-percent" id="progressPercent">0%</div>
 </div>
 
 <!-- ── SPLIT VIEW ── -->
@@ -1620,25 +1651,51 @@
         ];
         let mi = 0;
         const msgEl = document.getElementById('loadingMsg');
+
+        // --- NEW PROGRESS BAR LOGIC ---
+        let progress = 0;
+        const progressFill = document.getElementById('progressFill');
+        const progressPercent = document.getElementById('progressPercent');
+        progressFill.style.width = '0%';
+        progressPercent.textContent = '0%';
+
         const interval = setInterval(() => {
             mi = (mi + 1) % msgs.length;
             msgEl.textContent = msgs[mi];
-        }, 1800);
+        }, 2000);
+
+        const progressInterval = setInterval(() => {
+            if (progress < 85) {
+                progress += Math.random() * 4;
+            } else if (progress < 96) {
+                progress += 0.5;
+            }
+            const currentP = Math.floor(Math.min(progress, 96));
+            progressFill.style.width = `${currentP}%`;
+            progressPercent.textContent = `${currentP}%`;
+        }, 600);
 
         try {
             const res = await fetch('/analyze', { method: 'POST', body: formData });
             const data = await res.json();
             clearInterval(interval);
-            document.getElementById('loading').classList.remove('active');
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            progressPercent.textContent = '100%';
 
-            if (data.success) {
-                renderResults(data);
-            } else {
-                document.getElementById('uploadView').style.display = 'block';
-                showError(data.error || 'An unknown error occurred.');
-            }
+            setTimeout(() => {
+                document.getElementById('loading').classList.remove('active');
+
+                if (data.success) {
+                    renderResults(data);
+                } else {
+                    document.getElementById('uploadView').style.display = 'block';
+                    showError(data.error || 'An unknown error occurred.');
+                }
+            }, 500);
         } catch (e) {
             clearInterval(interval);
+            clearInterval(progressInterval);
             document.getElementById('loading').classList.remove('active');
             document.getElementById('uploadView').style.display = 'block';
             showError('Could not reach the server. Is Flask running?');
