@@ -15,3 +15,5 @@ RUN mkdir -p uploads
 
 # Run the app using Gunicorn on the port Google Cloud provides
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app
+
+https://noxis-278388103464.asia-south1.run.app

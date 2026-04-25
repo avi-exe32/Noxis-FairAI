@@ -154,7 +154,7 @@ def analyze():
             # ── SHAP CHART GENERATION ──
             try:
                 # 1. Sample data for speed (SHAP is heavy)
-                X_sample = X.sample(n=min(150, len(X)), random_state=42)
+                X_sample = X.sample(n=min(100, len(X)), random_state=42)
                 
                 # 2. Style Matplotlib for Dark Mode!
                 plt.style.use('dark_background')
@@ -331,7 +331,11 @@ Max 180 words. Be direct. Do not introduce yourself. Plain text only, no markdow
 
     except Exception as e:
         import traceback
-        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
+        # Just before the 'return jsonify'
+    if len(explanation) > 5000:
+        explanation = explanation[:5000] + "... [Truncated for size]"
+        
+    return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -407,7 +411,7 @@ The Python script must strictly follow these steps to avoid AIF360 errors:
 7. Convert the dataframe into an AIF360 BinaryLabelDataset.
 8. Apply the Reweighing algorithm.
 9. Extract the newly calculated instance weights and add them as a new column 'fair_weights'.
-10. Save the mitigated dataframe to a new file named 'mitigated_dataset.csv'.
+10. Save the mitigated dataframe to '/tmp/mitigated_dataset.csv'.
 
 IMPORTANT: Reply ONLY with valid, well-commented Python code. 
 Do not use Markdown formatting like ```python or ```. Do not add any conversational text before or after the code.
@@ -437,6 +441,12 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
         return jsonify({'success': False, 'error': str(e)})
 
 import os
+
+from flask import send_from_path
+
+@app.route('/download-mitigated')
+def download_mitigated():
+    return send_from_path('/tmp', 'mitigated_dataset.csv', as_attachment=True)
 
 if __name__ == '__main__':
     # Cloud Run provides the PORT environment variable. Default to 8080 if running locally.
