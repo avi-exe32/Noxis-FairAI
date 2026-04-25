@@ -1,37 +1,39 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+import numpy as np
 import pickle
+from sklearn.linear_model import LogisticRegression
 
-INPUT_CSV = "mitigated_dataset.csv" # Change to static/biased_dataset.csv if you moved it
-OUTPUT_MODEL = "static/test3_model.pkl"
+df = pd.read_csv('static/biased_dataset.csv')  # swap to mitigated_dataset.csv to get fair model
 
-df = pd.read_csv(INPUT_CSV)
+LABEL = 'income'
+SENSITIVE = 'sex'
 
-# Clean missing values marked as '?'
-df = df.replace('?', pd.NA).dropna()
+y = (df[LABEL] == '>50K').astype(int)
+X = pd.get_dummies(df.drop(columns=[LABEL]), drop_first=True)
 
-# Map target to 1 (>50K) and 0 (<=50K)
-df['income'] = df['income'].apply(lambda x: 1 if '>50K' in str(x) else 0)
+# Use instance_weights from AIF360 if present, else apply bias manually
+if 'instance_weights' in df.columns:
+    print("✅ Using AIF360 weights from mitigated dataset — training FAIR model")
+    weights = df['instance_weights'].values
+else:
+    print("⚠ No weights found — applying manual bias — training VILLAIN model")
+    sex_col = [c for c in X.columns if 'sex' in c.lower()][0]
+    weights = np.ones(len(X))
+    weights[(X[sex_col] == 1) & (y == 1)] = 4.0
+    weights[(X[sex_col] == 0) & (y == 1)] = 0.05
 
-# Convert text features to numbers
-df_numeric = pd.get_dummies(df, drop_first=True)
+clf = LogisticRegression(max_iter=1000, random_state=42)
+clf.fit(X, y, sample_weight=weights)
 
-X = df_numeric.drop('income', axis=1)
-y = df_numeric['income']
+preds = clf.predict(X)
+sex_col = [c for c in X.columns if 'sex' in c.lower()][0]
+male_rate   = preds[X[sex_col] == 1].mean()
+female_rate = preds[X[sex_col] == 0].mean()
+print(f"Male prediction rate:   {male_rate:.2%}")
+print(f"Female prediction rate: {female_rate:.2%}")
+print(f"Disparate Impact:       {female_rate/male_rate:.4f}")
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+with open('biased_model.pkl', 'wb') as f:
+    pickle.dump(clf, f)
 
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-with open(OUTPUT_MODEL, 'wb') as f:
-    pickle.dump(model, f)
-
-print(f"✅ Success! Model saved as {OUTPUT_MODEL}")
-print(f"📊 Model Accuracy: {model.score(X_test, y_test) * 100:.1f}%")
-
-# Output for the model
-#✅ Success! Model saved as static/test2_model.pkl
-#📊 Model Accuracy: 84.2%
-#trained on a real dataset from kaggle
+print("✅ Saved biased_model.pkl")
