@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import numpy as np
 import os
@@ -446,7 +446,8 @@ from flask import send_from_path
 
 @app.route('/download-mitigated')
 def download_mitigated():
-    return send_from_path('/tmp', 'mitigated_dataset.csv', as_attachment=True)
+    # This is the safer way to send the file from the cloud's temp folder
+    return send_file('/tmp/mitigated_dataset.csv', as_attachment=True)
 
 if __name__ == '__main__':
     # Cloud Run provides the PORT environment variable. Default to 8080 if running locally.
