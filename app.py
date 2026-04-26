@@ -6,6 +6,7 @@ import numpy as np
 import os
 import pickle
 import tempfile
+import requests
 
 # Suppress oneDNN optimization warnings
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -464,6 +465,23 @@ Do not use Markdown formatting like ```python or ```. Do not add any conversatio
     return Response(stream_response(), mimetype='text/plain')
 
 
+@app.route('/proxy_csv', methods=['POST'])
+def proxy_csv():
+    data = request.get_json()
+    url = data.get('url')
+    if not url:
+        return jsonify({'success': False, 'error': 'No URL provided'})
+    try:
+        # Fetch the live CSV data from the public link
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        
+        # Send the raw text directly back to the frontend
+        return Response(response.text, mimetype='text/csv')
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 @app.route('/save_result', methods=['POST'])
 def save_result():
     data = request.json
@@ -483,6 +501,82 @@ def download_mitigated():
         return send_file(path, as_attachment=True)
     else:
         return "File not found. Please process the data first.", 404
+    
+
+@app.route('/red_team', methods=['POST'])
+def red_team():
+    try:
+        data = request.get_json()
+        context = data.get('context', {})
+
+        prompt = f"""
+        Act as an AI Red Team Cybersecurity expert. 
+        I just audited an AI model. Here are the fairness metrics:
+        Sensitive Attribute: {context.get('sensitive_attr')}
+        Disparate Impact: {context.get('disparate_impact')}
+        Grade: {context.get('grade')}
+        
+        Your job is to invent 3 highly specific, realistic "Adversarial Edge-Case Personas" who belong to the disadvantaged group and would likely be unfairly rejected by this biased model despite being highly qualified.
+        
+        Return ONLY raw HTML code (no markdown code blocks). Format exactly 3 cards using this structure:
+        
+        <div style="background: var(--surface2); border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; padding: 16px; border-left: 4px solid var(--bad); margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: var(--text); font-size: 14px;">[Persona Name]</strong>
+                <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: var(--bad); border: 1px solid var(--bad); padding: 2px 6px; border-radius: 4px;">TARGET ACQUIRED</span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">[Brief background]</div>
+            <div style="background: rgba(248,113,113,0.05); padding: 10px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: #fca5a5;">
+                <strong>VULNERABILITY TRIGGER:</strong> [Explain the specific bias trigger]
+            </div>
+        </div>
+        """
+
+        response = client.models.generate_content(
+            model='gemini-3.1-pro-preview', 
+            contents=prompt
+        )
+        html_output = response.text.replace("```html", "").replace("```", "").strip()
+
+        return jsonify({"success": True, "html_payload": html_output})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/human_impact', methods=['POST'])
+def human_impact():
+    try:
+        data = request.get_json()
+        context = data.get('context', {})
+
+        prompt = f"""
+        Act as a Social Impact Journalist. 
+        I audited an AI model for bias on '{context.get('sensitive_attr')}'.
+        Disparate Impact: {context.get('disparate_impact')}.
+        
+        Create 3 empathetic, realistic personas of people from the DISADVANTAGED group.
+        Return ONLY raw HTML. Format exactly 3 cards using this compact structure:
+        
+        <div style="background: var(--surface2); border: 1px solid rgba(52,211,153,0.3); border-radius: 12px; padding: 16px; border-left: 4px solid var(--good); margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: var(--text); font-size: 14px;">[Name]</strong>
+                <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: var(--good); border: 1px solid var(--good); padding: 2px 6px; border-radius: 4px;">CASE STUDY</span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">[Brief background story]</div>
+            <div style="background: rgba(52,211,153,0.05); padding: 10px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: #6ee7b7;">
+                <strong>IMPACT TRACE:</strong> {context.get('sensitive_attr')} Bias in {context.get('label_col')}
+            </div>
+        </div>
+        """
+
+        response = client.models.generate_content(
+            model='gemini-3.1-pro-preview', 
+            contents=prompt
+        )
+        html_output = response.text.replace("```html", "").replace("```", "").strip()
+
+        return jsonify({"success": True, "html_payload": html_output})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     # Cloud Run provides the PORT environment variable. Default to 8080 if running locally.

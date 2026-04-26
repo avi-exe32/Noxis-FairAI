@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Noxis — AI Fairness Auditor</title>
@@ -520,6 +520,151 @@
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
         }
+        
+
+        /* ── TABS ── */
+        .tab-nav {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2px;
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active {
+            color: var(--accent2);
+            border-bottom-color: var(--accent2);
+        }
+        .tab-pane { display: none; animation: fadeUp 0.3s forwards; }
+        .tab-pane.active { display: block; }
+
+        /* ── CUSTOM CHART BUILDER ── */
+        .chart-builder-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .chart-builder-card h3 {
+            font-size: 12px;
+            font-family: 'Space Mono', monospace;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+        .chart-type-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .chart-type-btn {
+            padding: 7px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Space Mono', monospace;
+        }
+        .chart-type-btn:hover, .chart-type-btn.selected {
+            border-color: var(--accent);
+            color: var(--text);
+            background: rgba(168,85,247,0.08);
+        }
+        .chart-search {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            outline: none;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        .chart-search:focus { border-color: var(--accent); }
+        .attr-select-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .attr-select-row select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            outline: none;
+        }
+        .attr-select-row select:focus { border-color: var(--accent); }
+        .add-chart-btn {
+            width: 100%;
+            padding: 11px;
+            background: rgba(168,85,247,0.1);
+            border: 1px solid rgba(168,85,247,0.4);
+            border-radius: 10px;
+            color: var(--accent);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .add-chart-btn:hover { background: rgba(168,85,247,0.18); }
+        .custom-charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .custom-chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            position: relative;
+        }
+        .custom-chart-card .chart-card-title {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'Space Mono', monospace;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .remove-chart-btn {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            transition: color 0.2s;
+        }
+        .remove-chart-btn:hover { color: var(--bad); }
 
         /* ── SPLIT-SCREEN VIEW ── */
         #splitView {
@@ -1275,14 +1420,21 @@
                 </button>
             </div>
 
+            <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 16px;">
+                <input type="text" id="datasetUrlInput" placeholder="Paste live CSV URL (e.g., GitHub raw link, public API)" style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s;">
+                <button type="button" onclick="fetchLiveUrl()" class="reset-btn" id="fetchUrlBtn" style="border-color: var(--accent); color: var(--accent); font-weight: 600; background: rgba(168,85,247,0.05);">🔗 Connect Live Data</button>
+            </div>
+
+            <div style="text-align: center; margin: 0 0 16px 0; color: var(--muted); font-size: 11px; font-weight: 700; font-family: 'Space Mono', monospace; letter-spacing: 1px;">— OR —</div>
+
             <div class="form-group">
-                <label>Upload CSV File</label>
+                <label>Upload Local CSV File</label>
                 <div class="upload-zone" id="csvZone" onclick="document.getElementById('dataset_input').click()">
                     <input type="file" id="dataset_input" accept=".csv">
                     <div class="upload-icon">📊</div>
                     <div class="upload-text">
-                        <div class="upload-label"><strong>Click to upload</strong> or drag & drop your dataset</div>
-                        <div class="upload-sub">.csv files only</div>
+                        <div class="upload-label" id="csvUploadLabel"><strong>Click to upload</strong> or drag & drop your dataset</div>
+                        <div class="upload-sub" id="csvUploadSub">.csv files only</div>
                         <div id="csvBadge" class="file-badge"></div>
                     </div>
                 </div>
@@ -1466,108 +1618,376 @@
 
     <!-- RIGHT: Audit Report -->
     <div class="report-panel">
-
         <div class="report-top-bar">
             <div class="report-title-group">
                 <h2>Audit Report</h2>
             </div>
             <div style="display: flex; gap: 10px;" data-html2canvas-ignore="true">
-                <button class="reset-btn" onclick="exportPDF()" style="border-color: var(--accent2); color: var(--accent2);">📄 Export PDF Report</button>
                 <button class="reset-btn" onclick="resetForm()">← Analyze Another</button>
             </div>
         </div>
 
-        <!-- Grade + verdict row -->
-        <div class="grade-verdict-row">
-            <div id="gradeCircle"></div>
-            <div class="verdict-and-meta">
-                <div id="verdictBadge"></div>
-                <div id="metaRow" class="meta-row"></div>
-            </div>
+        <div class="tab-nav" id="reportTabs">
+            <button class="tab-btn active" onclick="switchTab('tab-overview', this)">Overview & Mitigation</button>
+            <button class="tab-btn" onclick="switchTab('tab-charts', this)">Visualizations</button>
+            <button class="tab-btn" onclick="switchTab('tab-compliance', this)">Legal & Compliance</button>
+            <button class="tab-btn" onclick="switchTab('tab-human', this)">Human Impact</button>
+            <button class="tab-btn" onclick="switchTab('tab-redteam', this)">Red Teaming</button>
+            <button class="tab-btn" onclick="switchTab('tab-sandbox', this)">Simulation Lab</button>
+            <button class="tab-btn" onclick="switchTab('tab-history', this)">Audit Log</button>
         </div>
 
-        <div class="section-label">Fairness Metrics</div>
+        <div class="report-pane-buffer"></div>
 
-        <!-- Metrics -->
-        <div class="metrics-grid" id="metricsGrid"></div>
-
-        <!-- Group comparison -->
-        <div class="group-card" id="groupCard"></div>
-
-        <div class="section-label">Gemini Analysis</div>
-
-        <!-- Gemini explanation -->
-        <div class="explanation-card">
-            <div class="explanation-header">
-                <div class="gemini-dot"></div>
-                <span>Gemini Analysis</span>
+        <!-- TAB 1: OVERVIEW -->
+        <div id="tab-overview" class="tab-pane active">
+            <div class="grade-verdict-row">
+                <div id="gradeCircle"></div>
+                <div class="verdict-and-meta">
+                    <div id="verdictBadge"></div>
+                    <div id="metaRow" class="meta-row"></div>
+                </div>
             </div>
-            <div class="explanation-text" id="explanationText"></div>
+
+            <div class="section-label">Fairness Metrics</div>
+            <div class="metrics-grid" id="metricsGrid"></div>
+            <div class="group-card" id="groupCard"></div>
+
+            <div class="section-label">Gemini Analysis</div>
+            <div class="explanation-card">
+                <div class="explanation-header">
+                    <div class="gemini-dot"></div>
+                    <span>Gemini Analysis</span>
+                </div>
+                <div class="explanation-text" id="explanationText"></div>
+            </div>
+
+            <button class="mitigate-btn" id="mitigateBtn" onclick="generateStrategy()" data-html2canvas-ignore="true">
+                ⚡ Generate Python Mitigation Script
+            </button>
+            <div class="strategy-loading" id="strategyLoading">
+                <div style="margin-bottom: 12px;">Gemini is writing the python script...</div>
+                <div class="progress-container" style="margin-top: 0; width: 100%;">
+                    <div class="progress-fill" id="mitigateProgressFill"></div>
+                </div>
+                <div class="progress-percent" id="mitigateProgressPercent" style="margin-top: 8px;">0%</div>
+            </div>
+            <div class="strategy-card" id="strategyCard">
+                <div class="strategy-header">
+                    <div class="strategy-dot"></div>
+                    <span>Auto-Generated Mitigation Script</span>
+                </div>
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">
+                    Run this Python file in the same folder as your CSV to generate a new, reweighed dataset that mathematically offsets the bias.
+                </div>
+                <div class="code-block-container">
+                    <div class="code-header">
+                        <span class="code-filename">mitigate_bias.py</span>
+                        <div class="code-actions">
+                            <button id="copyBtn" onclick="copyCode()">Copy Code</button>
+                            <button onclick="downloadCode()">Download .py</button>
+                        </div>
+                    </div>
+                    <pre class="code-body"><code id="strategyCode"></code></pre>
+                </div>
+            </div>
+            <div class="strategy-card" id="fixedAssetsCard" style="display: none; margin-top: 14px; background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.3);">
+                <div class="strategy-header">
+                    <div class="strategy-dot" style="background: var(--good); box-shadow: 0 0 8px var(--good);"></div>
+                    <span style="color: var(--good);">Download Mitigated Assets</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <a href="/static/fixed_dataset.csv" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">📥 Fixed Dataset</a>
+                    <a href="/static/fixed_model.pkl" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">🤖 Fair Model</a>
+                </div>
+            </div>
         </div>
+        <div id="tab-human" class="tab-pane">
+            <div class="section-label" style="color: var(--good); border-bottom-color: rgba(52,211,153,0.3);">Real-World Impact Analysis</div>
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6;">
+                Identify the individuals most likely to be negatively affected by systemic bias in this dataset.
+            </p>
 
-        <!-- Mitigation Strategy -->
-        <button class="mitigate-btn" id="mitigateBtn" onclick="generateStrategy()" data-html2canvas-ignore="true">
-            ⚡ Generate Python Mitigation Script
-        </button>
-        <div class="strategy-loading" id="strategyLoading">
-            <div style="margin-bottom: 12px;">Gemini is writing the python script...</div>
-            <div class="progress-container" style="margin-top: 0; width: 100%;">
-                <div class="progress-fill" id="mitigateProgressFill"></div>
+            <button class="add-chart-btn" id="humanImpactBtn" onclick="generateHumanImpact()" style="background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.4); color: var(--good); font-size: 14px; padding: 14px; margin-bottom: 24px;">
+                👤 Analyze Human Impact
+            </button>
+
+            <div id="humanLoading" style="display: none; padding: 30px; text-align: center; border: 1px solid rgba(52,211,153,0.2); border-radius: 12px; background: #07070d; margin-bottom: 24px;">
+                <div class="loader-ring" style="width: 30px; height: 30px; border-top-color: var(--good); margin: 0 auto 15px;"></div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 12px; color: var(--good); letter-spacing: 1px; margin-bottom: 12px;">IDENTIFYING AFFECTED PERSONAS...</div>
+                
+                <div class="progress-container" style="width: 100%; height: 6px; background: var(--surface2); border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+                    <div class="progress-fill" id="humanProgressFill" style="height: 100%; width: 0%; background: var(--good); border-radius: 10px; transition: width 0.3s ease;"></div>
+                </div>
+                <div class="progress-percent" id="humanProgressPercent" style="font-family: 'Space Mono'; font-size: 10px; color: var(--good); margin-top: 6px;">0%</div>
             </div>
-            <div class="progress-percent" id="mitigateProgressPercent" style="margin-top: 8px;">0%</div>
+
+            <div id="humanResults" style="display: flex; flex-direction: column; gap: 16px;">
+                </div>
         </div>
-        <div class="strategy-card" id="strategyCard">
-            <div class="strategy-header">
-                <div class="strategy-dot"></div>
-                <span>Auto-Generated Mitigation Script</span>
+        <!-- TAB 2: VISUALIZATIONS -->
+        <div id="tab-charts" class="tab-pane">
+
+            <!-- SHAP (locked, not editable) -->
+            <div class="shap-card" id="shapCard" style="margin-bottom: 24px;">
+                <h3>Model Feature Importance (SHAP)</h3>
+                <p class="shap-desc">Features at the top drove the model's decisions the most. This chart is auto-generated and read-only.</p>
+                <div class="shap-img-container">
+                    <img id="shapImg" class="shap-img" alt="SHAP Summary Plot">
+                </div>
             </div>
-            <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">
-                Run this Python file in the same folder as your CSV to generate a new, reweighed dataset that mathematically offsets the bias.
+
+            <!-- Default 4 charts (editable attributes) -->
+            <div class="section-label">Default Charts — Click ✏ to Edit Attributes</div>
+            <div class="metrics-grid" style="gap: 16px; margin-bottom: 24px;">
+                <div class="metric-card" style="padding: 16px; height: 280px;">
+                    <div class="chart-card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span id="chart1-title" style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">Demographic Split</span>
+                        <button class="chart-type-btn" style="padding:3px 8px;font-size:10px;" onclick="openEditChart(1)">✏ Edit</button>
+                    </div>
+                    <div style="position: relative; height: 220px; width: 100%;"><canvas id="chart1"></canvas></div>
+                </div>
+                <div class="metric-card" style="padding: 16px; height: 280px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span id="chart2-title" style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">Approval Rates by Group</span>
+                        <button class="chart-type-btn" style="padding:3px 8px;font-size:10px;" onclick="openEditChart(2)">✏ Edit</button>
+                    </div>
+                    <div style="position: relative; height: 220px; width: 100%;"><canvas id="chart2"></canvas></div>
+                </div>
+                <div class="metric-card" style="padding: 16px; height: 280px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span id="chart3-title" style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">Overall Outcomes</span>
+                        <button class="chart-type-btn" style="padding:3px 8px;font-size:10px;" onclick="openEditChart(3)">✏ Edit</button>
+                    </div>
+                    <div style="position: relative; height: 220px; width: 100%;"><canvas id="chart3"></canvas></div>
+                </div>
+                <div class="metric-card" style="padding: 16px; height: 280px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span id="chart4-title" style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">Fairness Score Deviations</span>
+                        <button class="chart-type-btn" style="padding:3px 8px;font-size:10px;" onclick="openEditChart(4)">✏ Edit</button>
+                    </div>
+                    <div style="position: relative; height: 220px; width: 100%;"><canvas id="chart4"></canvas></div>
+                </div>
             </div>
-            <div class="code-block-container">
-                <div class="code-header">
-                    <span class="code-filename">mitigate_bias.py</span>
-                    <div class="code-actions">
-                        <button id="copyBtn" onclick="copyCode()">Copy Code</button>
-                        <button onclick="downloadCode()">Download .py</button>
+
+            <!-- Edit Chart Modal -->
+            <div id="editChartModal" style="display:none; background: var(--surface2); border: 1px solid var(--border-bright); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:14px;letter-spacing:1px;">✏ EDIT CHART <span id="editChartNum"></span></div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">Chart Type</label>
+                    <select id="editChartType" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+                        <option value="doughnut">Doughnut</option>
+                        <option value="bar">Bar</option>
+                        <option value="pie">Pie</option>
+                        <option value="line">Line</option>
+                        <option value="polarArea">Polar Area</option>
+                        <option value="radar">Radar</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">Data to Show</label>
+                    <select id="editChartData" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+                        <option value="demographic">Demographic Split (counts)</option>
+                        <option value="approval">Approval Rates by Group</option>
+                        <option value="outcomes">Overall Outcomes</option>
+                        <option value="fairness">Fairness Score Deviations</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <button onclick="applyEditChart()" class="add-chart-btn" style="flex:1;">Apply Changes</button>
+                    <button onclick="document.getElementById('editChartModal').style.display='none'" class="reset-btn" style="flex:1;">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Custom Chart Builder -->
+            <div class="chart-builder-card">
+                <h3>➕ Add Custom Chart</h3>
+                <input class="chart-search" id="chartSearch" placeholder="Search chart type... (bar, pie, line, radar, doughnut, polar)" oninput="filterChartTypes()">
+                <div class="chart-type-grid" id="chartTypeGrid">
+                    <button class="chart-type-btn selected" onclick="selectChartType(this,'bar')"> Bar</button>
+                    <button class="chart-type-btn" onclick="selectChartType(this,'pie')"> Pie</button>
+                    <button class="chart-type-btn" onclick="selectChartType(this,'doughnut')"> Doughnut</button>
+                    <button class="chart-type-btn" onclick="selectChartType(this,'line')"> Line</button>
+                    <button class="chart-type-btn" onclick="selectChartType(this,'radar')"> Radar</button>
+                    <button class="chart-type-btn" onclick="selectChartType(this,'polarArea')"> Polar Area</button>
+                </div>
+                <div class="attr-select-row">
+                    <div>
+                        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">X Axis / Labels</label>
+                        <select id="customXAxis" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+                            <option value="groups">Groups (from sensitive attr)</option>
+                            <option value="metrics">Fairness Metrics</option>
+                            <option value="outcomes">Outcome Labels</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">Y Axis / Values</label>
+                        <select id="customYAxis" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
+                            <option value="count">Row Count</option>
+                            <option value="approval_rate">Approval Rate (%)</option>
+                            <option value="metric_values">Metric Values</option>
+                        </select>
                     </div>
                 </div>
-                <pre class="code-body"><code id="strategyCode"></code></pre>
+                <button class="add-chart-btn" onclick="addCustomChart()">➕ Add Chart to Dashboard</button>
+            </div>
+
+            <!-- Custom Charts Render Area -->
+            <div class="custom-charts-grid" id="customChartsGrid"></div>
+
+        </div>
+
+
+        <div id="tab-compliance" class="tab-pane">
+            <div class="section-label">Regulatory Readiness Report</div>
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.6;">
+                Noxis automatically maps your fairness metrics against major international AI regulations. 
+                <br><em style="font-size: 11px; opacity: 0.7;">Disclaimer: This is a mathematical risk assessment, not formal legal counsel.</em>
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <div class="card" style="background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;">US EEOC Uniform Guidelines</h3>
+                            <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);">Federal 4/5ths Rule (80% Impact Ratio)</div>
+                        </div>
+                        <div id="badge-eeoc" style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px;">Pending...</div>
+                    </div>
+                    <p style="font-size: 13px; color: #c0c0d8; line-height: 1.6; margin-bottom: 12px;">
+                        Requires that the selection rate for any protected group is no less than 80% (4/5ths) of the rate for the group with the highest selection rate.
+                    </p>
+                    <div style="background: var(--bg); padding: 10px 14px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);" id="detail-eeoc"></div>
+                </div>
+
+                <div class="card" style="background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;">NYC Local Law 144 (AEDT)</h3>
+                            <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);">Automated Employment Decision Tools</div>
+                        </div>
+                        <div id="badge-nyc" style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px;">Pending...</div>
+                    </div>
+                    <p style="font-size: 13px; color: #c0c0d8; line-height: 1.6; margin-bottom: 12px;">
+                        Mandates annual independent bias audits for AI tools used in hiring/promotion within NYC. Strictly enforces public disclosure of impact ratios.
+                    </p>
+                    <div style="background: var(--bg); padding: 10px 14px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);" id="detail-nyc"></div>
+                </div>
+
+                <div class="card" style="background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;">European Union AI Act</h3>
+                            <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);">High-Risk AI Systems (Annex III)</div>
+                        </div>
+                        <div id="badge-eu" style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px;">Pending...</div>
+                    </div>
+                    <p style="font-size: 13px; color: #c0c0d8; line-height: 1.6; margin-bottom: 12px;">
+                        Requires stringent risk management, data governance, and mitigation of bias that could lead to discrimination (Article 10). Emphasizes balanced error rates.
+                    </p>
+                    <div style="background: var(--bg); padding: 10px 14px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);" id="detail-eu"></div>
+                </div>
+
+            </div>
+        </div>
+        
+        <div id="tab-redteam" class="tab-pane">
+            <div class="section-label" style="color: var(--bad); border-bottom-color: rgba(248,113,113,0.3);">Offensive AI Testing (Red Team)</div>
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6;">
+                Actively stress-test your model. Noxis will generate synthetic, adversarial edge-case profiles designed specifically to expose the hidden biases detected in your audit.
+            </p>
+
+            <button class="add-chart-btn" id="redTeamBtn" onclick="runRedTeamAttack()" style="background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.4); color: var(--bad); font-size: 14px; padding: 14px; margin-bottom: 24px;">
+                🔥 Launch Adversarial Attack
+            </button>
+
+            <div id="redTeamLoading" style="display: none; padding: 30px; text-align: center; border: 1px solid rgba(248,113,113,0.2); border-radius: 12px; background: #090505; margin-bottom: 24px;">
+                <div class="gemini-dot" style="background: var(--bad); box-shadow: 0 0 12px var(--bad); margin: 0 auto 16px;"></div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 12px; color: var(--bad); letter-spacing: 1px; animation: pulse 1s infinite; margin-bottom: 12px;">GENERATING ADVERSARIAL PAYLOADS...</div>
+                
+                <div class="progress-container" style="width: 100%; height: 6px; background: #1a0a0a; border-radius: 10px; overflow: hidden; border: 1px solid rgba(248,113,113,0.2);">
+                    <div class="progress-fill" id="redTeamProgressFill" style="height: 100%; width: 0%; background: var(--bad); border-radius: 10px; transition: width 0.3s ease;"></div>
+                </div>
+                <div class="progress-percent" id="redTeamProgressPercent" style="font-family: 'Space Mono'; font-size: 10px; color: var(--bad); margin-top: 6px;">0%</div>
+            </div>
+
+            <div id="redTeamResults" style="display: flex; flex-direction: column; gap: 16px;"></div>
+        </div>
+        
+    <div id="tab-sandbox" class="tab-pane">
+    <div class="section-label" style="color: var(--accent); border-bottom-color: rgba(168,85,247,0.3);">Noxis Simulation Lab</div>
+    
+    <div class="card" style="padding: 24px; background: var(--surface2); margin-bottom: 24px; border: 1px solid var(--border-bright);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+                <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--accent); letter-spacing: 1px;">01 — WHAT-IF SIMULATOR</div>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">Manually adjust group approval rates to see how it affects your compliance grade.</p>
+            </div>
+            <div id="sandboxGrade"></div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div class="form-group">
+                <label style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span id="label-priv">Privileged Group</span> <span id="val-priv" style="color:var(--accent2); font-family: 'Space Mono';">80%</span>
+                </label>
+                <input type="range" id="slider-priv" min="1" max="100" value="80" style="width: 100%; accent-color: var(--accent2);" oninput="updateSandbox()">
+            </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; justify-content: space-between; font-size: 12px;">
+                            <span id="label-unpriv">Unprivileged Group</span> <span id="val-unpriv" style="color: var(--accent); font-family: 'Space Mono';">40%</span>
+                        </label>
+                        <input type="range" id="slider-unpriv" min="1" max="100" value="40" style="width: 100%; accent-color: var(--accent);" oninput="updateSandbox()">
+                    </div>
+                </div>
+
+            <div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border);">
+                    <div style="font-family: 'Space Mono'; font-size: 10px; color: var(--muted); margin-bottom: 5px;">DISPARATE IMPACT RATIO</div>
+                    <div id="sb-di" style="font-family: 'Space Mono'; font-size: 24px; font-weight: 700;">0.50</div>
+                    <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">Target: 0.80 - 1.25</div>
+                </div>
+                <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border);">
+                    <div style="font-family: 'Space Mono'; font-size: 10px; color: var(--muted); margin-bottom: 5px;">STATISTICAL PARITY DIFF</div>
+                    <div id="sb-sp" style="font-family: 'Space Mono'; font-size: 24px; font-weight: 700;">-0.40</div>
+                    <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">Target: -0.10 to 0.10</div>
+                </div>
             </div>
         </div>
 
-        <div class="strategy-card" id="fixedAssetsCard" style="display: none; margin-top: 14px; background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.3);">
-            <div class="strategy-header">
-                <div class="strategy-dot" style="background: var(--good); box-shadow: 0 0 8px var(--good);"></div>
-                <span style="color: var(--good);">Download Mitigated Assets</span>
-            </div>
-            <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">
-                Don't have time to run the script locally? Download the pre-processed fair dataset and the retrained model to test them in Noxis.
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <a href="/static/fixed_dataset.csv" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">📥 Fixed Dataset</a>
-                <a href="/static/fixed_model.pkl" download class="reset-btn" style="border-color: var(--good); color: var(--good); text-decoration: none; text-align: center; flex: 1;">🤖 Fair Model</a>
-            </div>
-        </div>
-
-        <div class="section-label">Feature Importance (SHAP)</div>
-
-        <!-- SHAP Chart -->
-        <div class="shap-card" id="shapCard">
-            <h3>Model Feature Importance (SHAP)</h3>
-            <p class="shap-desc">Features at the top drove the model's decisions the most. Watch out if your sensitive attribute is high on this list.</p>
-            <div class="shap-img-container">
-                <img id="shapImg" class="shap-img" alt="SHAP Summary Plot">
+        <div class="card" style="padding: 24px; background: var(--surface2); border: 1px solid rgba(56,189,248,0.3);">
+            <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--accent2); margin-bottom:10px; letter-spacing: 1px;">02 — CEO STRATEGY BOARD</div>
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px;">
+                <div style="position: relative; height: 250px;"><canvas id="ceoChart"></canvas></div>
+                <div>
+                    <label style="display: block; font-size: 12px; color: var(--text); margin-bottom: 12px;">Adjustment Intensity (Mitigation Strength)</label>
+                    <input type="range" id="ceo-slider" min="0" max="100" value="50" style="width: 100%; accent-color: var(--accent2); margin-bottom: 20px;" oninput="updateCEOVisualization()">
+                    
+                    <div style="background: rgba(7,7,13,0.4); padding: 16px; border-radius: 12px; border: 1px solid var(--border);">
+                        <div style="margin-bottom: 12px;">
+                            <span style="font-size: 11px; color: var(--muted); display: block;">PROJECTED ACCURACY</span>
+                            <span id="ceo-acc" style="font-family: 'Space Mono'; font-size: 18px; color: var(--accent2);">96.5%</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; color: var(--muted); display: block;">FAIRNESS COMPLIANCE</span>
+                            <span id="ceo-fair" style="font-family: 'Space Mono'; font-size: 18px; color: var(--good);">HIGH</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+   </div>
 
-        <div class="section-label">Audit History</div>
-        <div class="card" id="historyCard" style="background: var(--surface2); padding: 20px;">
-            <div id="history-list" style="display: flex; flex-direction: column; gap: 10px;">
-                <p style="color: var(--muted); font-size: 13px;">No past audits found. Run your first audit to see history.</p>
+        <!-- TAB 3: AUDIT LOG -->
+        <div id="tab-history" class="tab-pane">
+            <div class="card" id="historyCard" style="background: var(--surface2); padding: 20px;">
+                <div id="history-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: var(--muted); font-size: 13px;">Loading audit history...</p>
+                </div>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -1575,6 +1995,8 @@
 <!-- ALL JAVASCRIPT IS PRESERVED EXACTLY AS-IS FROM ORIGINAL        -->
 <!-- ─────────────────────────────────────────────────────────────── -->
 <script>
+    let csvFile = null;
+    let modelFile = null;
     // --- 1. Fix Drag and Drop & Extract File Parsing ---
     function processFileForHeaders(file) {
         if (!file) return;
@@ -1644,6 +2066,10 @@
         const files = e.dataTransfer.files;
         if (files[0] && files[0].name.toLowerCase().endsWith('.csv')) {
             csvFile = files[0];
+            // Clear URL and reset the UI if they upload a real file
+            document.getElementById('datasetUrlInput').value = ''; 
+            document.getElementById('csvUploadLabel').innerHTML = '<strong>Click to upload</strong> or drag & drop your dataset';
+            document.getElementById('csvUploadSub').textContent = '.csv files only';
             const badge = document.getElementById('csvBadge');
             badge.textContent = '📄 ' + csvFile.name;
             badge.style.display = 'inline-flex';
@@ -1657,6 +2083,52 @@
         const badge = document.getElementById('modelBadge');
         badge.textContent = '🤖 ' + modelFile.name;
         badge.style.display = 'inline-flex';
+    }
+
+    async function fetchLiveUrl() {
+        const url = document.getElementById('datasetUrlInput').value.trim();
+        if (!url) return showError("Please enter a valid URL.");
+        
+        const btn = document.getElementById('fetchUrlBtn');
+        btn.textContent = "Fetching...";
+        btn.disabled = true;
+        hideError();
+
+        try {
+            const res = await fetch('/proxy_csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            if (!res.ok) throw new Error("Failed to fetch from that URL.");
+
+            const csvText = await res.text();
+            
+            // Create the virtual file
+            csvFile = new File([csvText], "live_database.csv", { type: "text/csv" });
+            
+            // Clear the local file input memory
+            document.getElementById('dataset_input').value = ''; 
+            
+            // Transform the Drop Zone UI!
+            const badge = document.getElementById('csvBadge');
+            badge.textContent = '🟢 Live Data Connected';
+            badge.style.display = 'inline-flex';
+            
+            // Truncate the URL if it's too long so it doesn't break the UI
+            const displayUrl = url.length > 45 ? url.substring(0, 45) + '...' : url;
+            document.getElementById('csvUploadLabel').innerHTML = `<strong>Active Data Link:</strong> <span style="font-family: 'Space Mono', monospace; font-size: 11px;">${displayUrl}</span>`;
+            document.getElementById('csvUploadSub').textContent = 'Live connection established. (Drop a local file to override)';
+
+            processFileForHeaders(csvFile);
+
+        } catch (e) {
+            showError("Could not fetch CSV. Make sure the URL is public and points directly to a raw CSV file.");
+        }
+        
+        btn.textContent = "🔗 Connect Live Data";
+        btn.disabled = false;
     }
 
     document.getElementById('modelInput').addEventListener('change', function(e) {
@@ -1945,7 +2417,9 @@
         document.getElementById('explanationText').textContent = data.explanation;
         // Show model vs dataset comparison if model was used
         const explanationCard = document.getElementById('explanationText').parentElement.parentElement;
+        // Show model vs dataset comparison if model was used
         if (data.model_used && data.eq_odds_diff !== null) {
+            const explanationCard = document.getElementById('explanationText').parentElement;
             const existing = document.getElementById('modelReportBanner');
             if (!existing) {
                 const banner = document.createElement('div');
@@ -1956,6 +2430,7 @@
                     border-radius: 12px;
                     padding: 16px 20px;
                     margin-bottom: 14px;
+                    margin-top: 14px;
                     font-size: 13px;
                     color: #c0c0d8;
                     line-height: 1.8;
@@ -1977,8 +2452,7 @@
                     <br><br>
                     <strong>Overall model verdict: ${modelFair ? '✅ Your model predictions are fair' : '⚠ Your model predictions show bias beyond the dataset'}</strong>
                 `;
-                const shapContainer = document.getElementById('shapCard');
-                shapContainer.parentNode.insertBefore(banner, shapContainer.nextSibling);
+                explanationCard.appendChild(banner);
             }
         }
 
@@ -1990,8 +2464,47 @@
         } else {
             shapCard.style.display = 'none';
         }
+        // --- COMPLIANCE HUB ENGINE ---
+        const diScore = data.disparate_impact !== null ? data.disparate_impact : 1;
+        const spScore = data.stat_parity !== null ? Math.abs(data.stat_parity) : 0;
+        const eqScore = data.eq_odds_diff !== null ? Math.abs(data.eq_odds_diff) : 0;
 
+        // 1. EEOC (Disparate Impact >= 0.8)
+        const passEEOC = diScore >= 0.8 && diScore <= 1.25;
+        const bEEOC = document.getElementById('badge-eeoc');
+        bEEOC.textContent = passEEOC ? "✅ COMPLIANT" : "❌ VIOLATION RISK";
+        bEEOC.style.background = passEEOC ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)";
+        bEEOC.style.color = passEEOC ? "var(--good)" : "var(--bad)";
+        bEEOC.style.border = passEEOC ? "1px solid rgba(52,211,153,0.3)" : "1px solid rgba(248,113,113,0.3)";
+        document.getElementById('detail-eeoc').innerHTML = `Your Disparate Impact score is <span style="color:${passEEOC?'var(--good)':'var(--bad)'}">${diScore.toFixed(3)}</span>. ${passEEOC ? 'This meets the federal 80% threshold.' : 'This falls below the legal 0.80 threshold, indicating actionable bias.'}`;
+
+        // 2. NYC 144 (Disparate Impact must be highly balanced)
+        const passNYC = diScore >= 0.8;
+        const bNYC = document.getElementById('badge-nyc');
+        bNYC.textContent = passNYC ? "✅ COMPLIANT" : "❌ VIOLATION RISK";
+        bNYC.style.background = passNYC ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)";
+        bNYC.style.color = passNYC ? "var(--good)" : "var(--bad)";
+        bNYC.style.border = passNYC ? "1px solid rgba(52,211,153,0.3)" : "1px solid rgba(248,113,113,0.3)";
+        document.getElementById('detail-nyc').innerHTML = passNYC ? 'Impact Ratio is publicly defensible under Local Law 144 guidelines.' : 'Requires immediate mitigation before deployment in New York City jurisdictions.';
+
+        // 3. EU AI Act (Strict - Requires Statistical Parity <= 0.1 AND Equal Opp <= 0.1 if model used)
+        let passEU = spScore <= 0.1;
+        let euReason = `Statistical Parity diff is <span style="color:${passEU?'var(--good)':'var(--bad)'}">${spScore.toFixed(3)}</span> (Requires ≤ 0.10).`;
+        
+        if (data.model_used) {
+            const passModelEU = eqScore <= 0.1;
+            passEU = passEU && passModelEU;
+            euReason += ` Model Equal Opp diff is <span style="color:${passModelEU?'var(--good)':'var(--bad)'}">${eqScore.toFixed(3)}</span>.`;
+        }
+        
+        const bEU = document.getElementById('badge-eu');
+        bEU.textContent = passEU ? "✅ COMPLIANT" : "❌ HIGH RISK";
+        bEU.style.background = passEU ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)";
+        bEU.style.color = passEU ? "var(--good)" : "var(--bad)";
+        bEU.style.border = passEU ? "1px solid rgba(52,211,153,0.3)" : "1px solid rgba(248,113,113,0.3)";
+        document.getElementById('detail-eu').innerHTML = passEU ? `Passes Article 10 data bias assessments. ${euReason}` : `Fails Article 10 compliance for High-Risk AI. ${euReason}`;
         // Show the split view
+        renderDefaultCharts(data);
         document.getElementById('splitView').classList.add('active');
     }
 
@@ -2188,29 +2701,364 @@ function downloadCode() {
         }
     }
 
-function exportPDF() {
-    const element = document.querySelector('.report-panel');
-    
-    // Temporarily remove scrolling so the PDF captures the whole long page
-    const originalHeight = element.style.height;
-    const originalOverflow = element.style.overflowY;
-    element.style.height = 'auto';
-    element.style.overflowY = 'visible';
-    
-    const opt = {
-        margin:       0.4,
-        filename:     'Noxis_Fairness_Audit.pdf',
-        image:        { type: 'jpeg', quality: 1.0 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#07070d' }, // Forces your dark theme background
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(element).save().then(() => {
-        // Put the scrolling back to normal after the PDF downloads
-        element.style.height = originalHeight;
-        element.style.overflowY = originalOverflow;
-    });
+// ── TAB SWITCHER ──
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+        if (tabId === 'tab-history') window.loadHistory && window.loadHistory();
+    }
+
+    // ── CHART STATE ──
+    let lastChartData = null;
+    let customChartInstances = [];
+    let selectedCustomChartType = 'bar';
+    let editingChartNum = null;
+
+    const chartColors = ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#f87171', '#818cf8'];
+
+    function buildChartDataset(xAxis, yAxis, data) {
+        const labels = Object.keys(data.group_stats);
+        const counts = labels.map(l => data.group_stats[l].count);
+        const rates = labels.map(l => (data.group_stats[l].favorable_rate || 0) * 100);
+        let totalFav = 0, totalUnfav = 0;
+        labels.forEach(l => {
+            const fav = Math.round(data.group_stats[l].count * (data.group_stats[l].favorable_rate || 0));
+            totalFav += fav; totalUnfav += (data.group_stats[l].count - fav);
+        });
+
+        if (xAxis === 'groups' && yAxis === 'count') return { labels, datasets: [{ data: counts, backgroundColor: chartColors, borderWidth: 0 }] };
+        if (xAxis === 'groups' && yAxis === 'approval_rate') return { labels, datasets: [{ label: '% Approved', data: rates, backgroundColor: chartColors, borderRadius: 4, borderWidth: 0 }] };
+        if (xAxis === 'outcomes') return { labels: ['Favorable', 'Unfavorable'], datasets: [{ data: [totalFav, totalUnfav], backgroundColor: ['#34d399', '#f87171'], borderWidth: 0 }] };
+        if (xAxis === 'metrics' || yAxis === 'metric_values') {
+            const statP = data.stat_parity ? Math.abs(data.stat_parity) : 0;
+            const eqOpp = data.eq_odds_diff ? Math.abs(data.eq_odds_diff) : 0;
+            return { labels: ['Stat Parity Diff', 'Equal Opp Diff'], datasets: [{ label: 'Distance from Fair', data: [statP, eqOpp], backgroundColor: '#fbbf24', borderRadius: 4, borderWidth: 0 }] };
+        }
+        return { labels, datasets: [{ data: counts, backgroundColor: chartColors, borderWidth: 0 }] };
+    }
+
+function renderDefaultCharts(data) {
+        lastChartData = data;
+        
+        // Define all our selects right at the top so there are no ReferenceErrors!
+        const xAxisSelect = document.getElementById('customXAxis');
+        const yAxisSelect = document.getElementById('customYAxis');
+        const saSelect = document.getElementById('sa_dropdown');
+        
+        // 1. Populate X-Axis
+        if (xAxisSelect) {
+            xAxisSelect.innerHTML = `
+                <optgroup label="Audit Results (Calculated)">
+                    <option value="groups">${data.sensitive_attr} (Groups)</option>
+                    <option value="metrics">Fairness Metrics</option>
+                    <option value="outcomes">${data.label_col} (Outcomes)</option>
+                </optgroup>
+            `;
+            if (saSelect && saSelect.options.length > 1) {
+                let rawGroup = '<optgroup label="Raw Dataset Columns">';
+                Array.from(saSelect.options).forEach(opt => {
+                    if (opt.value) rawGroup += `<option value="raw_${opt.value}">${opt.value} (Raw Column)</option>`;
+                });
+                rawGroup += '</optgroup>';
+                xAxisSelect.innerHTML += rawGroup;
+            }
+        }
+
+        // 2. Populate Y-Axis
+        if (yAxisSelect) {
+            yAxisSelect.innerHTML = `
+                <optgroup label="Calculated Metrics">
+                    <option value="count">Row Count</option>
+                    <option value="approval_rate">Approval Rate (%)</option>
+                    <option value="metric_values">Metric Values</option>
+                </optgroup>
+            `;
+            if (saSelect && saSelect.options.length > 1) {
+                let rawGroupY = '<optgroup label="Raw Dataset Columns (Averages)">';
+                Array.from(saSelect.options).forEach(opt => {
+                    if (opt.value) rawGroupY += `<option value="raw_${opt.value}">${opt.value} (Average)</option>`;
+                });
+                rawGroupY += '</optgroup>';
+                yAxisSelect.innerHTML += rawGroupY;
+            }
+        }
+        
+        Chart.defaults.color = '#6b6b8a';
+        Chart.defaults.font.family = "'Space Mono', monospace";
+
+        const labels = Object.keys(data.group_stats);
+        const counts = labels.map(l => data.group_stats[l].count);
+        const rates = labels.map(l => (data.group_stats[l].favorable_rate || 0) * 100);
+        let totalFav = 0, totalUnfav = 0;
+        labels.forEach(l => {
+            const fav = Math.round(data.group_stats[l].count * (data.group_stats[l].favorable_rate || 0));
+            totalFav += fav; totalUnfav += (data.group_stats[l].count - fav);
+        });
+        const statP = data.stat_parity ? Math.abs(data.stat_parity) : 0;
+        const eqOpp = data.eq_odds_diff ? Math.abs(data.eq_odds_diff) : 0;
+
+        if (window.c1) window.c1.destroy();
+        if (window.c2) window.c2.destroy();
+        if (window.c3) window.c3.destroy();
+        if (window.c4) window.c4.destroy();
+
+        const baseOpts = { responsive: true, maintainAspectRatio: false };
+
+        window.c1 = new Chart(document.getElementById('chart1').getContext('2d'), {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data: counts, backgroundColor: chartColors, borderWidth: 0 }] },
+            options: { ...baseOpts, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+        });
+        window.c2 = new Chart(document.getElementById('chart2').getContext('2d'), {
+            type: 'bar',
+            data: { labels, datasets: [{ label: '% Approved', data: rates, backgroundColor: chartColors, borderRadius: 4, borderWidth: 0 }] },
+            options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { y: { max: 100, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+        });
+        window.c3 = new Chart(document.getElementById('chart3').getContext('2d'), {
+            type: 'pie',
+            data: { labels: ['Favorable', 'Unfavorable'], datasets: [{ data: [totalFav, totalUnfav], backgroundColor: ['#34d399', '#f87171'], borderWidth: 0 }] },
+            options: { ...baseOpts, plugins: { legend: { position: 'bottom' } } }
+        });
+        window.c4 = new Chart(document.getElementById('chart4').getContext('2d'), {
+            type: 'bar',
+            data: { labels: ['Stat Parity Diff', 'Equal Opp Diff'], datasets: [{ label: 'Distance from Fair', data: [statP, eqOpp], backgroundColor: '#fbbf24', borderRadius: 4 }] },
+            options: { indexAxis: 'y', ...baseOpts, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' } }, y: { grid: { display: false } } } }
+        });
+    }
+
+    // ── EDIT DEFAULT CHARTS ──
+    function openEditChart(num) {
+        editingChartNum = num;
+        document.getElementById('editChartNum').textContent = num;
+        document.getElementById('editChartModal').style.display = 'block';
+        document.getElementById('editChartModal').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function applyEditChart() {
+        if (!lastChartData || !editingChartNum) return;
+        const type = document.getElementById('editChartType').value;
+        const dataKey = document.getElementById('editChartData').value;
+        const canvasId = 'chart' + editingChartNum;
+        const titleId = 'chart' + editingChartNum + '-title';
+        const winKey = 'c' + editingChartNum;
+
+        const titleMap = { demographic: 'Demographic Split', approval: 'Approval Rates', outcomes: 'Overall Outcomes', fairness: 'Fairness Deviations' };
+        if (document.getElementById(titleId)) document.getElementById(titleId).textContent = titleMap[dataKey] || dataKey;
+
+        const xMap = { demographic: 'groups', approval: 'groups', outcomes: 'outcomes', fairness: 'metrics' };
+        const yMap = { demographic: 'count', approval: 'approval_rate', outcomes: 'count', fairness: 'metric_values' };
+
+        const chartData = buildChartDataset(xMap[dataKey], yMap[dataKey], lastChartData);
+
+        if (window[winKey]) window[winKey].destroy();
+        window[winKey] = new Chart(document.getElementById(canvasId).getContext('2d'), {
+            type,
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: ['bar', 'line'].includes(type) ? {
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                } : {}
+            }
+        });
+        document.getElementById('editChartModal').style.display = 'none';
+    }
+
+    // ── CUSTOM CHART BUILDER ──
+    function selectChartType(btn, type) {
+        document.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedCustomChartType = type;
+    }
+
+    function filterChartTypes() {
+        const q = document.getElementById('chartSearch').value.toLowerCase();
+        document.querySelectorAll('.chart-type-btn').forEach(btn => {
+            btn.style.display = btn.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    }
+
+async function addCustomChart() {
+        if (!lastChartData) return;
+        const xAxis = document.getElementById('customXAxis').value;
+        const yAxis = document.getElementById('customYAxis').value;
+        const type = selectedCustomChartType;
+        
+        let chartData, title;
+
+        // --- HYBRID LOGIC: If either axis uses RAW CSV data ---
+        if (xAxis.startsWith('raw_') || yAxis.startsWith('raw_')) {
+            if (!csvFile) return alert("CSV file not found.");
+            
+            const xColName = xAxis.startsWith('raw_') ? xAxis.replace('raw_', '') : lastChartData.sensitive_attr;
+            const yColName = yAxis.startsWith('raw_') ? yAxis.replace('raw_', '') : null;
+            
+            const text = await csvFile.text();
+            const lines = text.split('\n').filter(l => l.trim().length > 0);
+            const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''));
+            
+            const xIndex = headers.indexOf(xColName);
+            const yIndex = yColName ? headers.indexOf(yColName) : -1;
+            
+            if (xIndex === -1) return alert(`Column ${xColName} not found.`);
+
+            const groupsData = {};
+            let isNumericY = true;
+            let validYCount = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i].split(',').map(c => c.trim().replace(/['"]/g, ''));
+                const xVal = row[xIndex];
+                if (!xVal) continue;
+                
+                if (!groupsData[xVal]) groupsData[xVal] = { count: 0, sum: 0 };
+                groupsData[xVal].count += 1;
+                
+                if (yIndex !== -1) {
+                    let rawY = row[yIndex];
+                    // FIX 1: Only strip commas and $. Do NOT strip letters, otherwise ">50K" becomes "50"!
+                    let cleanY = String(rawY).replace(/[$,]/g, "").trim();
+                    let yVal = Number(cleanY);
+                    
+                    if (!isNaN(yVal) && cleanY !== "") {
+                        groupsData[xVal].sum += yVal;
+                        validYCount++;
+                    }
+                }
+            }
+
+            // If less than 20% of the column was a real number, it's a text category
+            if (yIndex !== -1 && validYCount < (lines.length * 0.2)) {
+                isNumericY = false;
+            }
+
+            const sortedLabels = Object.keys(groupsData).sort((a, b) => groupsData[b].count - groupsData[a].count).slice(0, 15);
+            
+            const dataValues = sortedLabels.map(l => {
+                if (yColName) {
+                    if (isNumericY) {
+                        return groupsData[l].count > 0 ? parseFloat((groupsData[l].sum / groupsData[l].count).toFixed(2)) : 0;
+                    } else {
+                        return groupsData[l].count; 
+                    }
+                } else {
+                    return groupsData[l].count;
+                }
+            });
+
+            let yTitleDesc = `Avg ${yColName}`;
+            if (yColName && !isNumericY) {
+                yTitleDesc = `Count`;
+                alert(`Note: '${yColName}' contains text categories (like >50K). We cannot average text, so we mapped the Row Count instead!`);
+            }
+
+            // --- FIX 2: Dynamic Colors for Bar Charts ---
+            const extendedColors = sortedLabels.map((_, i) => chartColors[i % chartColors.length]);
+            
+            let bgColors = extendedColors.map(c => c + 'CC'); // 80% opacity for bars
+            let borderColors = extendedColors;
+
+            if (type === 'line') {
+                bgColors = 'rgba(168,85,247,0.2)'; // Faint purple fill for lines
+                borderColors = '#a855f7';
+            } else if (type === 'radar' || type === 'polarArea') {
+                bgColors = extendedColors.map(c => c + '66'); // More transparent for radials
+            }
+
+            chartData = {
+                labels: sortedLabels,
+                datasets: [{
+                    label: yColName ? `${yTitleDesc} by ${xColName}` : `Count of ${xColName}`,
+                    data: dataValues,
+                    backgroundColor: bgColors,
+                    borderColor: borderColors,
+                    borderWidth: type === 'line' ? 2 : 1,
+                    borderRadius: type === 'bar' ? 6 : 0,
+                    tension: 0.3,
+                    fill: (type === 'line' || type === 'radar') ? true : false
+                }]
+            };
+            title = yColName ? `Raw Data: ${xColName} × ${yTitleDesc}` : `Raw Data: ${xColName} Count`;
+        
+        // --- STANDARD AUDIT METRICS ---
+        } else {
+            chartData = buildChartDataset(xAxis, yAxis, lastChartData);
+            const titleMap = { count: 'Row Count', approval_rate: 'Approval Rate', metric_values: 'Metric Values' };
+            const xMap = { groups: lastChartData.sensitive_attr, metrics: 'Fairness Metrics', outcomes: 'Outcomes' };
+            title = `${xMap[xAxis]} × ${titleMap[yAxis]} (${type})`;
+            
+            if (type === 'radar' || type === 'polarArea') {
+                chartData.datasets[0].backgroundColor = chartData.datasets[0].backgroundColor.map(c => 
+                    (typeof c === 'string' && c.startsWith('#') && c.length === 7) ? c + '80' : c
+                );
+                chartData.datasets[0].fill = true;
+            }
+            if (type === 'bar') {
+                 // Ensure default audit bars get the rainbow treatment too!
+                 chartData.datasets[0].backgroundColor = chartData.datasets[0].data.map((_, i) => chartColors[i % chartColors.length] + 'CC');
+                 chartData.datasets[0].borderColor = chartData.datasets[0].data.map((_, i) => chartColors[i % chartColors.length]);
+                 chartData.datasets[0].borderWidth = 1;
+            }
+        }
+
+        // --- RENDER THE CHART ---
+        const id = 'custom-chart-' + Date.now();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-chart-card';
+        wrapper.id = 'wrapper-' + id;
+        wrapper.innerHTML = `
+            <div class="chart-card-title">
+                <span>${title}</span>
+                <button class="remove-chart-btn" onclick="removeCustomChart('${id}')">✕</button>
+            </div>
+            <div style="position:relative;height:200px;width:100%;"><canvas id="${id}"></canvas></div>
+        `;
+        document.getElementById('customChartsGrid').appendChild(wrapper);
+
+        let scalesConfig = {};
+        if (['bar', 'line'].includes(type)) {
+            scalesConfig = {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                x: { grid: { display: false } }
+            };
+        } else if (['radar', 'polarArea'].includes(type)) {
+            scalesConfig = {
+                r: { 
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    angleLines: { color: 'rgba(255,255,255,0.1)' },
+                    ticks: { backdropColor: 'transparent', color: '#6b6b8a' }
+                }
+            };
+        }
+
+        const instance = new Chart(document.getElementById(id).getContext('2d'), {
+            type,
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: type !== 'bar', position: 'bottom' } }, // Hide redundant legend on rainbow bar charts
+                scales: scalesConfig
+            }
+        });
+        customChartInstances.push({ id, instance });
+    }
+
+function removeCustomChart(id) {
+    const idx = customChartInstances.findIndex(c => c.id === id);
+    if (idx !== -1) { 
+        customChartInstances[idx].instance.destroy(); 
+        customChartInstances.splice(idx, 1); 
+    }
+    const wrapper = document.getElementById('wrapper-' + id);
+    if (wrapper) wrapper.remove();
 }
+
 
 function downloadSamples(event) {
     // Prevent the click from opening the upload file explorer
@@ -2236,7 +3084,242 @@ function downloadSamples(event) {
     });
 }
 
+async function runRedTeamAttack() {
+        if (!auditContext || !auditContext.disparate_impact) return alert("Run a dataset audit first!");
+        
+        const btn = document.getElementById('redTeamBtn');
+        const loading = document.getElementById('redTeamLoading');
+        const results = document.getElementById('redTeamResults');
+        const fill = document.getElementById('redTeamProgressFill');
+        const percent = document.getElementById('redTeamProgressPercent');
 
+        btn.style.display = 'none';
+        loading.style.display = 'block';
+        results.innerHTML = '';
+        
+        // Reset Progress Bar
+        let prog = 0;
+        fill.style.width = '0%';
+        percent.textContent = '0%';
+        
+        const progInt = setInterval(() => {
+            prog += (99 - prog) * 0.008; 
+            fill.style.width = Math.floor(prog) + '%';
+            percent.textContent = Math.floor(prog) + '%';
+        }, 100);
+
+        try {
+            const res = await fetch('/red_team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: auditContext })
+            });
+
+            const data = await res.json();
+            clearInterval(progInt);
+            fill.style.width = '100%';
+            percent.textContent = '100%';
+            
+            setTimeout(() => {
+                loading.style.display = 'none';
+                btn.style.display = 'block';
+                btn.textContent = "↻ Relaunch Attack";
+                results.innerHTML = data.html_payload;
+            }, 300);
+        } catch (e) {
+            clearInterval(progInt);
+            loading.style.display = 'none';
+            btn.style.display = 'block';
+            alert("Error: " + e.message);
+        }
+    }
+
+    async function generateHumanImpact() {
+        if (!auditContext || !auditContext.disparate_impact) return alert("Run a dataset audit first!");
+        
+        const btn = document.getElementById('humanImpactBtn');
+        const loading = document.getElementById('humanLoading');
+        const results = document.getElementById('humanResults');
+        const fill = document.getElementById('humanProgressFill');
+        const percent = document.getElementById('humanProgressPercent');
+
+        btn.style.display = 'none';
+        loading.style.display = 'block';
+        results.innerHTML = '';
+
+        // Reset Progress Bar
+        let prog = 0;
+        fill.style.width = '0%';
+        percent.textContent = '0%';
+        
+        const progInt = setInterval(() => {
+            prog += (99 - prog) * 0.008; 
+            fill.style.width = Math.floor(prog) + '%';
+            percent.textContent = Math.floor(prog) + '%';
+        }, 100);
+
+        try {
+            const res = await fetch('/human_impact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: auditContext })
+            });
+            const data = await res.json();
+            
+            clearInterval(progInt);
+            fill.style.width = '100%';
+            percent.textContent = '100%';
+            
+            setTimeout(() => {
+                loading.style.display = 'none';
+                btn.style.display = 'block';
+                btn.textContent = "↻ Re-analyze Impact";
+                results.innerHTML = data.html_payload;
+            }, 300);
+        } catch (e) {
+            clearInterval(progInt);
+            loading.style.display = 'none';
+            btn.style.display = 'block';
+            alert("Error: " + e.message);
+        }
+    }
+let ceoChartInstance = null;
+
+function updateSandbox() {
+        // 1. Dynamic Labels from Audit Context
+        if (auditContext && auditContext.group_stats) {
+            const groups = Object.keys(auditContext.group_stats);
+            document.getElementById('label-priv').textContent = groups[1] + " Approval Rate";
+            document.getElementById('label-unpriv').textContent = groups[0] + " Approval Rate";
+        }
+
+        const priv = document.getElementById('slider-priv').value / 100;
+        const unpriv = document.getElementById('slider-unpriv').value / 100;
+
+        document.getElementById('val-priv').textContent = Math.round(priv * 100) + "%";
+        document.getElementById('val-unpriv').textContent = Math.round(unpriv * 100) + "%";
+
+        // MATH: Ratio and Difference
+        const di = priv > 0 ? (unpriv / priv) : 0;
+        const sp = unpriv - priv;
+
+        const diEl = document.getElementById('sb-di');
+        const spEl = document.getElementById('sb-sp');
+        
+        diEl.textContent = di.toFixed(3);
+        spEl.textContent = sp.toFixed(3);
+
+        diEl.style.color = (di >= 0.8 && di <= 1.25) ? 'var(--good)' : 'var(--bad)';
+        spEl.style.color = (Math.abs(sp) <= 0.1) ? 'var(--good)' : 'var(--bad)';
+
+        // Update Grade Based on Sandbox Values
+        let score = 100;
+        if (Math.abs(1 - di) > 0.2) score -= 40;
+        if (Math.abs(sp) > 0.1) score -= 40;
+        
+        let grade = score >= 80 ? 'A' : (score >= 60 ? 'B' : 'F');
+        document.getElementById('sandboxGrade').innerHTML = `
+            <div class="grade-circle ${grade}" style="transform: scale(0.6); margin: -15px;">
+                <div class="grade-letter">${grade}</div>
+            </div>
+        `;
+    }
+
+let ceoTicking = false;
+
+    function updateCEOVisualization() {
+        if (!ceoTicking) {
+            window.requestAnimationFrame(() => {
+                const val = document.getElementById('ceo-slider').value;
+                const accuracy = (98 - (val * 0.06)).toFixed(1);
+                
+                document.getElementById('ceo-acc').textContent = accuracy + "%";
+                
+                const fairStatus = val > 80 ? "OPTIMAL" : (val > 40 ? "COMPLIANT" : "RISKY");
+                const fairColor = val > 80 ? "var(--good)" : (val > 40 ? "var(--warn)" : "var(--bad)");
+                
+                document.getElementById('ceo-fair').textContent = fairStatus;
+                document.getElementById('ceo-fair').style.color = fairColor;
+
+                if (ceoChartInstance) {
+                    // Directly update data and call update with 0 duration
+                    ceoChartInstance.data.datasets[2].data = [{x: parseInt(val), y: parseFloat(accuracy)}];
+                    ceoChartInstance.update('none'); // 'none' is the fastest update mode
+                }
+                ceoTicking = false;
+            });
+            ceoTicking = true;
+        }
+    }
+
+    function initCEOChart() {
+        const ctx = document.getElementById('ceoChart').getContext('2d');
+        if (ceoChartInstance) ceoChartInstance.destroy();
+
+        ceoChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 11}, (_, i) => i * 10),
+                datasets: [
+                    {
+                        label: 'Accuracy %',
+                        data: [98, 97.5, 97, 96.5, 96, 95.5, 95, 94.5, 94, 93.5, 92],
+                        borderColor: '#38bdf8',
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Fairness Gain',
+                        data: [10, 25, 40, 55, 70, 80, 88, 94, 97, 99, 100],
+                        borderColor: '#a855f7',
+                        tension: 0.4,
+                        pointRadius: 0,
+                        fill: true,
+                        backgroundColor: 'rgba(168,85,247,0.05)',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Current Strategy',
+                        data: [{x: 50, y: 95.5}],
+                        backgroundColor: '#fff',
+                        pointRadius: 6,
+                        pointHoverRadius: 6, // Match radius to stop "pulsing" glitch
+                        showLine: false,
+                        type: 'scatter',
+                        animation: false // Disable animation for this specific dataset
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // Turn off global animations for max performance
+                hover: { mode: null }, // Disable hover logic to stop flickering
+                tooltips: { enabled: false }, // Disable tooltips for the sandbox
+                scales: { 
+                    y: { display: false, min: 90, max: 105 }, 
+                    x: { 
+                        type: 'linear', // Use linear scale for proper dot placement
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { color: '#6b6b8a', font: { size: 9 } },
+                        min: 0,
+                        max: 100
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+    // Initialize these when the tab is clicked
+    const oldSwitchTab = switchTab;
+    switchTab = function(tabId, btn) {
+        oldSwitchTab(tabId, btn);
+        if (tabId === 'tab-sandbox') {
+            updateSandbox();
+            initCEOChart();
+        }
+    }; 
 
 </script>
 
@@ -2322,7 +3405,7 @@ function downloadSamples(event) {
             collection(db, "audits"),
             where("user_id", "==", user.uid),
             orderBy("timestamp", "desc"),
-            limit(5)
+            limit(20)
         );
 
         const querySnapshot = await getDocs(q);
@@ -2362,7 +3445,7 @@ function downloadSamples(event) {
         
         // Sort by timestamp descending and take first 5
         audits.sort((a, b) => b.timestamp?.toMillis() - a.timestamp?.toMillis());
-        const recentAudits = audits.slice(0, 5);
+        const recentAudits = audits.slice(0, 20);
         
         if (recentAudits.length === 0) {
             container.innerHTML = '<p style="color: var(--muted); font-size: 13px;">No past audits found. Run your first audit to see history.</p>';
@@ -2382,6 +3465,7 @@ function downloadSamples(event) {
         });
     }
   };
+
 </script>
 
 </body>
