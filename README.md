@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="static/logo.png" alt="Noxis" width="100"/>
+<img src="static/logo.png" alt="Noxis" width="300"/>
 
-# ⚖️ Noxis — AI Fairness Auditor
+#  Noxis — AI Fairness Auditor
 
 ### *Detect. Explain. Fix. AI Bias — Before It Harms.*
 
