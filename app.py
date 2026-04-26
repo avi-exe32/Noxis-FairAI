@@ -374,47 +374,41 @@ Max 180 words. Be direct. Do not introduce yourself. Plain text only, no markdow
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    try:
-        
-        data = request.get_json()
-        user_message = data.get('message', '').strip()
-        audit_context = data.get('context', {})
-        history = data.get('history', [])
+    data = request.get_json()
+    user_message = data.get('message', '').strip()
+    audit_context = data.get('context', {})
+    history = data.get('history', [])
 
-        if not user_message:
-            return jsonify({'success': False, 'error': 'Empty message'})
+    if not user_message:
+        return jsonify({'success': False, 'error': 'Empty message'})
 
-        # Build system context from the audit results
-        system_context = f"""You are an AI bias auditor.
+    system_context = f"""You are an AI bias auditor.
 Audit results: attribute='{audit_context.get('sensitive_attr')}', label='{audit_context.get('label_col')}'
 Disparate Impact: {audit_context.get('disparate_impact')} | Statistical Parity: {audit_context.get('stat_parity')}
 Groups: {audit_context.get('group_stats')}
 Answer the user's question about this audit in max 100 words. Be direct. Do not introduce yourself. Use plain text only and do not use markdown formatting like ** or *."""
 
-        # Build messages array with history
-        messages = [{'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]}]
-        
-        # Add conversation history (last 6 messages to keep context manageable)
-        if history:
-            messages = []
-            for turn in history[-6:]:
-                messages.append({'role': turn['role'], 'parts': [{'text': turn['text']}]})
-            # Inject context into the latest user message
-            messages.append({'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]})
+    messages = [{'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]}]
+    
+    if history:
+        messages = []
+        for turn in history[-6:]:
+            messages.append({'role': turn['role'], 'parts': [{'text': turn['text']}]})
+        messages.append({'role': 'user', 'parts': [{'text': system_context + '\n\nUser: ' + user_message}]})
 
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=messages
-        )
-        clean_reply = response.text.replace("**", "").replace("*", "")
+    def stream_chat():
+        try:
+            response_stream = client.models.generate_content_stream(
+                model="gemini-3.1-pro-preview",
+                contents=messages
+            )
+            for chunk in response_stream:
+                if chunk.text:
+                    yield chunk.text.replace("**", "").replace("*", "")
+        except Exception as e:
+            yield f"Error: {str(e)}"
 
-        return jsonify({
-            'success': True,
-            'reply': clean_reply
-        })
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    return Response(stream_chat(), mimetype='text/plain')
 
 @app.route('/mitigate', methods=['POST'])
 def mitigate():

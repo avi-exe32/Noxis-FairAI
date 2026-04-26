@@ -1268,22 +1268,22 @@
     <div class="upload-wrapper">
         <div class="card" id="uploadCard">
 
-            <div class="card-section-title">01 — Dataset Upload</div>
+            <div class="card-section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">
+                <span>01 — Dataset Upload</span>
+                <button type="button" onclick="downloadSamples(event)" style="background: rgba(56,189,248,0.1); border: 1px solid var(--accent2); color: var(--accent2); padding: 6px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                    📥 Download Sample Assets
+                </button>
+            </div>
 
             <div class="form-group">
                 <label>Upload CSV File</label>
                 <div class="upload-zone" id="csvZone" onclick="document.getElementById('dataset_input').click()">
-                    <input type="file" id="dataset_input" accept=".csv" onchange="handleCSV(this)">
+                    <input type="file" id="dataset_input" accept=".csv">
                     <div class="upload-icon">📊</div>
                     <div class="upload-text">
                         <div class="upload-label"><strong>Click to upload</strong> or drag & drop your dataset</div>
                         <div class="upload-sub">.csv files only</div>
                         <div id="csvBadge" class="file-badge"></div>
-                        <div style="margin-top: 16px; position: relative; z-index: 10;">
-                            <button type="button" onclick="downloadSamples(event)" style="background: rgba(221, 19, 103, 0.1); border: 1px solid var(--accent2); color: var(--accent2); padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                                📥 Download Sample CSV & Model
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1335,7 +1335,7 @@
                 <div class="form-group">
                     <label>Trained Model File (.pkl)</label>
                     <div class="upload-zone" id="modelZone" onclick="document.getElementById('modelInput').click()">
-                        <input type="file" id="modelInput" accept=".pkl" onchange="handleModel(this)">
+                        <input type="file" id="modelInput" accept=".pkl">
                         <div class="upload-icon">🤖</div>
                         <div class="upload-text">
                             <div class="upload-label"><strong>Click to upload</strong> your .pkl model</div>
@@ -1510,7 +1510,11 @@
             ⚡ Generate Python Mitigation Script
         </button>
         <div class="strategy-loading" id="strategyLoading">
-            Gemini is writing the python script...
+            <div style="margin-bottom: 12px;">Gemini is writing the python script...</div>
+            <div class="progress-container" style="margin-top: 0; width: 100%;">
+                <div class="progress-fill" id="mitigateProgressFill"></div>
+            </div>
+            <div class="progress-percent" id="mitigateProgressPercent" style="margin-top: 8px;">0%</div>
         </div>
         <div class="strategy-card" id="strategyCard">
             <div class="strategy-header">
@@ -1571,16 +1575,83 @@
 <!-- ALL JAVASCRIPT IS PRESERVED EXACTLY AS-IS FROM ORIGINAL        -->
 <!-- ─────────────────────────────────────────────────────────────── -->
 <script>
-    let csvFile = null;
-    let modelFile = null;
+    // --- 1. Fix Drag and Drop & Extract File Parsing ---
+    function processFileForHeaders(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const headerLine = text.split('\n')[0];
+            const headers = headerLine.split(',').map(h => h.trim().replace(/['"]/g, ''));
 
-    function handleCSV(input) {
-        csvFile = input.files[0];
-        const badge = document.getElementById('csvBadge');
-        badge.textContent = '📄 ' + csvFile.name;
-        badge.style.display = 'inline-flex';
+            const saSelect = document.getElementById('sa_dropdown');
+            const lcSelect = document.getElementById('lc_dropdown');
+            const pcSelect = document.getElementById('pc_dropdown');
+
+            saSelect.innerHTML = ''; lcSelect.innerHTML = ''; pcSelect.innerHTML = '<option value="">-- None --</option>';
+
+            headers.forEach(col => {
+                const saOpt = document.createElement('option');
+                saOpt.value = col;
+                saOpt.textContent = col;
+                saSelect.appendChild(saOpt);
+
+                const lcOpt = document.createElement('option');
+                lcOpt.value = col;
+                lcOpt.textContent = col;
+                lcSelect.appendChild(lcOpt);
+
+                const pcOpt = document.createElement('option');
+                pcOpt.value = col;
+                pcOpt.textContent = col;
+                pcSelect.appendChild(pcOpt);
+            });
+        };
+        reader.readAsText(file.slice(0, 5000));
     }
 
+    // Call this on both Click Upload AND Drag & Drop
+    document.getElementById('dataset_input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            csvFile = file;
+            const badge = document.getElementById('csvBadge');
+            badge.textContent = '📄 ' + csvFile.name;
+            badge.style.display = 'inline-flex';
+            processFileForHeaders(csvFile);
+        }
+    });
+
+    // Prevent browser from opening files when dragging over the page
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => e.preventDefault());
+
+    // Drag and drop on the upload zone
+    const csvZone = document.getElementById('csvZone');
+    csvZone.addEventListener('dragover', e => { 
+        e.preventDefault(); 
+        csvZone.classList.add('drag-over'); 
+    });
+    csvZone.addEventListener('dragleave', e => { 
+        // Only remove if leaving the zone entirely
+        if (!csvZone.contains(e.relatedTarget)) {
+            csvZone.classList.remove('drag-over');
+        }
+    });
+    csvZone.addEventListener('drop', e => {
+        e.preventDefault();
+        csvZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files[0] && files[0].name.toLowerCase().endsWith('.csv')) {
+            csvFile = files[0];
+            const badge = document.getElementById('csvBadge');
+            badge.textContent = '📄 ' + csvFile.name;
+            badge.style.display = 'inline-flex';
+            processFileForHeaders(csvFile);
+        }
+    });
+
+    // Model file handling
     function handleModel(input) {
         modelFile = input.files[0];
         const badge = document.getElementById('modelBadge');
@@ -1588,27 +1659,91 @@
         badge.style.display = 'inline-flex';
     }
 
-    function toggleOptional() {
-        const tog = document.getElementById('optToggle');
-        const sec = document.getElementById('optSection');
-        tog.classList.toggle('open');
-        sec.classList.toggle('open');
-    }
-
-    // Drag and drop
-    const csvZone = document.getElementById('csvZone');
-    csvZone.addEventListener('dragover', e => { e.preventDefault(); csvZone.classList.add('drag-over'); });
-    csvZone.addEventListener('dragleave', () => csvZone.classList.remove('drag-over'));
-    csvZone.addEventListener('drop', e => {
-        e.preventDefault();
-        csvZone.classList.remove('drag-over');
-        const files = e.dataTransfer.files;
-        if (files[0] && files[0].name.endsWith('.csv')) {
-            csvFile = files[0];
-            const badge = document.getElementById('csvBadge');
-            badge.textContent = '📄 ' + csvFile.name;
+    document.getElementById('modelInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            modelFile = file;
+            const badge = document.getElementById('modelBadge');
+            badge.textContent = '🤖 ' + modelFile.name;
             badge.style.display = 'inline-flex';
         }
+    });
+
+    // Drag and drop for model
+    const modelZone = document.getElementById('modelZone');
+    modelZone.addEventListener('dragover', e => { 
+        e.preventDefault(); 
+        modelZone.classList.add('drag-over'); 
+    });
+    modelZone.addEventListener('dragleave', e => { 
+        if (!modelZone.contains(e.relatedTarget)) {
+            modelZone.classList.remove('drag-over');
+        }
+    });
+    modelZone.addEventListener('drop', e => {
+        e.preventDefault();
+        modelZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files[0] && files[0].name.toLowerCase().endsWith('.pkl')) {
+            modelFile = files[0];
+            const badge = document.getElementById('modelBadge');
+            badge.textContent = '🤖 ' + modelFile.name;
+            badge.style.display = 'inline-flex';
+        }
+    });
+
+    // Make selects searchable by typing
+    ['sa_dropdown', 'lc_dropdown', 'pv_dropdown', 'pc_dropdown'].forEach(selectId => {
+        const select = document.getElementById(selectId);
+        let searchText = '';
+        let searchTimeout;
+
+        select.addEventListener('keydown', (e) => {
+            clearTimeout(searchTimeout);
+            
+            if (e.key.length === 1) {
+                searchText += e.key.toLowerCase();
+                const options = Array.from(select.options);
+                const match = options.find(opt => 
+                    opt.textContent.toLowerCase().startsWith(searchText)
+                );
+                if (match) {
+                    select.value = match.value;
+                }
+                searchTimeout = setTimeout(() => { searchText = ''; }, 1000);
+            }
+        });
+    });
+
+    // Update Privileged Value dropdown when Sensitive Attribute changes
+    document.getElementById('sa_dropdown').addEventListener('change', function() {
+        const file = csvFile;
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''));
+            
+            const colIndex = headers.indexOf(document.getElementById('sa_dropdown').value);
+            if (colIndex === -1) return;
+
+            const uniqueValues = [...new Set(lines.slice(1)
+                .map(line => line.split(',').map(c => c.trim().replace(/['"]/g, ''))[colIndex])
+                .filter(v => v && v.length > 0)
+            )];
+
+            const pvSelect = document.getElementById('pv_dropdown');
+            pvSelect.innerHTML = '<option value="">-- Select Value --</option>';
+            uniqueValues.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                pvSelect.appendChild(opt);
+            });
+        };
+        reader.readAsText(file);
     });
 
     function showError(msg) {
@@ -1636,7 +1771,7 @@
         formData.append('favorable_label', document.getElementById('favorableLabel').value);
         formData.append('privileged_val', privilegedVal);
 
-        const predCol = document.getElementById('pc_dropdown').value.trim();
+        const predCol = document.getElementById('predCol').value.trim() || document.getElementById('pc_dropdown').value.trim();
         if (predCol) formData.append('pred_col', predCol);
         if (modelFile) formData.append('model', modelFile);
 
@@ -1899,48 +2034,57 @@ function appendBubble(role, text) {
     return div;
 }
 
-async function sendChat() {
-    const input = document.getElementById('chatInput');
-    const btn = document.getElementById('chatSendBtn');
-    const message = input.value.trim();
-    if (!message) return;
+    // --- 3. Streaming Chat Upgrades ---
+    async function sendChat() {
+        const input = document.getElementById('chatInput');
+        const btn = document.getElementById('chatSendBtn');
+        const message = input.value.trim();
+        if (!message) return;
 
-    input.value = '';
-    btn.disabled = true;
-    document.getElementById('chatSuggestions').style.display = 'none';
+        input.value = '';
+        btn.disabled = true;
+        document.getElementById('chatSuggestions').style.display = 'none';
 
-    appendBubble('user', message);
-    const typingBubble = appendBubble('typing', 'Noxis is thinking...');
+        appendBubble('user', message);
+        const typingBubble = appendBubble('typing', 'Noxis is thinking...');
+        chatHistory.push({ role: 'user', text: message });
 
-    chatHistory.push({ role: 'user', text: message });
+        try {
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, context: auditContext, history: chatHistory })
+            });
+            
+            // STREAM THE CHAT RESPONSE
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            
+            typingBubble.remove();
+            const replyBubble = appendBubble('assistant', ''); // Empty bubble to fill
+            
+            let fullReply = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                fullReply += decoder.decode(value, { stream: true });
+                replyBubble.textContent = fullReply;
+                
+                // Keep scrolled to bottom while typing
+                const msgs = document.getElementById('chatMessages');
+                msgs.scrollTop = msgs.scrollHeight;
+            }
+            
+            chatHistory.push({ role: 'model', text: fullReply });
 
-    try {
-        const res = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message,
-                context: auditContext,
-                history: chatHistory
-            })
-        });
-        const data = await res.json();
-        typingBubble.remove();
-
-        if (data.success) {
-            appendBubble('assistant', data.reply);
-            chatHistory.push({ role: 'model', text: data.reply });
-        } else {
-            appendBubble('assistant', 'Error: ' + data.error);
+        } catch (e) {
+            typingBubble.remove();
+            appendBubble('assistant', 'Could not reach server.');
         }
-    } catch (e) {
-        typingBubble.remove();
-        appendBubble('assistant', 'Could not reach server.');
-    }
 
-    btn.disabled = false;
-    input.focus();
-}
+        btn.disabled = false;
+        input.focus();
+    }
 
 function copyCode() {
     const code = document.getElementById('strategyCode').textContent;
@@ -1963,65 +2107,86 @@ function downloadCode() {
     URL.revokeObjectURL(url);
 }
 
-async function generateStrategy() {
-    const btn = document.getElementById('mitigateBtn');
-    const loading = document.getElementById('strategyLoading');
-    const card = document.getElementById('strategyCard');
-    const codeEl = document.getElementById('strategyCode');
-
-    btn.disabled = true;
-    btn.textContent = 'Generating Script...';
-    loading.style.display = 'block';
-    card.style.display = 'none';
-    codeEl.textContent = '';
-
-    try {
-        const res = await fetch('/mitigate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ context: auditContext })
-        });
-        
-        if (!res.ok) {
-            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+    // --- 2. Grade A Popup & Mitigate Progress Bar ---
+    async function generateStrategy() {
+        // WARNING POPUP FOR 'A' GRADE
+        if (auditContext.grade === 'A') {
+            const proceed = confirm("✨ Your dataset already scored an 'A' and appears fair! Are you sure you want to run the mitigation script to mathematically fix it again?");
+            if (!proceed) return;
         }
+
+        const btn = document.getElementById('mitigateBtn');
+        const loading = document.getElementById('strategyLoading');
+        const card = document.getElementById('strategyCard');
+        const codeEl = document.getElementById('strategyCode');
+        const progressFill = document.getElementById('mitigateProgressFill');
+        const progressPercent = document.getElementById('mitigateProgressPercent');
         
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
+        btn.disabled = true;
+        btn.textContent = 'Generating Script...';
+        loading.style.display = 'block';
+        card.style.display = 'none';
+        codeEl.textContent = '';
         
-        loading.style.display = 'none';
-        card.style.display = 'block';
-        document.getElementById('fixedAssetsCard').style.display = 'block';
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Fake rapid progress bar (Matches the main analysis one!)
+        let prog = 0;
         
-        let fullText = '';
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            fullText += chunk;
-            codeEl.textContent = fullText;
-        }
-        
-        if (fullText.startsWith('ERROR:')) {
-            alert('Error generating script: ' + fullText.substring(6));
-            loading.style.display = 'block';
-            card.style.display = 'none';
-            btn.textContent = '⚡ Generate Fix Strategy';
-            btn.disabled = false;
-        } else {
+        // Notice: The "const" declarations are gone so it doesn't crash!
+        progressFill.style.width = '0%';
+        progressPercent.textContent = '0%';
+
+        const progInt = setInterval(() => {
+            // Moves 3% of the remaining distance to 99 every 100ms
+            prog += (99 - prog) * 0.03; 
+            
+            let currentP = Math.floor(prog);
+            progressFill.style.width = `${currentP}%`;
+            progressPercent.textContent = `${currentP}%`;
+        }, 100);
+
+        try {
+            const res = await fetch('/mitigate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: auditContext })
+            });
+            
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            
+            // --- SNAP TO 100% ---
+            clearInterval(progInt);
+            progressFill.style.width = '100%';
+            progressPercent.textContent = '100%';
+            
+            // Wait 400ms so the user sees the 100% hit before it vanishes
+            setTimeout(() => { 
+                loading.style.display = 'none'; 
+                card.style.display = 'block'; 
+                document.getElementById('fixedAssetsCard').style.display = 'block';
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 400);
+            
+            document.getElementById('fixedAssetsCard').style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            let fullText = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                fullText += decoder.decode(value, { stream: true });
+                codeEl.textContent = fullText;
+            }
             btn.textContent = '⚡ Regenerate Script';
             btn.disabled = false;
+        } catch (e) {
+            clearInterval(progInt);
+            loading.style.display = 'none';
+            alert('Error: ' + e.message);
+            btn.textContent = '⚡ Generate Fix Strategy';
+            btn.disabled = false;
         }
-    } catch (e) {
-        console.error('Stream error:', e);
-        loading.style.display = 'none';
-        card.style.display = 'none';
-        alert('Error: ' + e.message);
-        btn.textContent = '⚡ Generate Fix Strategy';
-        btn.disabled = false;
     }
-}
 
 function exportPDF() {
     const element = document.querySelector('.report-panel');
@@ -2071,74 +2236,7 @@ function downloadSamples(event) {
     });
 }
 
-// Auto-detect CSV columns and populate dropdowns
-document.getElementById('dataset_input').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const headerLine = text.split('\n')[0];
-        const headers = headerLine.split(',').map(h => h.trim().replace(/['"]/g, ''));
-
-        const sa = document.getElementById('sa_dropdown');
-        const lc = document.getElementById('lc_dropdown');
-        const pc = document.getElementById('pc_dropdown');
-
-        [sa, lc, pc].forEach(d => d.innerHTML = '<option value="">-- Select --</option>');
-
-        headers.forEach(col => {
-            const opt = () => {
-                const o = document.createElement('option');
-                o.value = col;
-                o.textContent = col;
-                return o;
-            };
-            
-            sa.appendChild(opt());
-            lc.appendChild(opt());
-            pc.appendChild(opt());
-        });
-    };
-    reader.readAsText(file.slice(0, 5000));
-});
-
-// Update Privileged Value dropdown when Sensitive Attribute changes
-document.getElementById('sa_dropdown').addEventListener('change', function() {
-    const file = csvFile;
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const lines = text.split('\n');
-        const headerLine = lines[0];
-        const headers = headerLine.split(',').map(h => h.trim().replace(/['"]/g, ''));
-        
-        const colIndex = headers.indexOf(document.getElementById('sa_dropdown').value);
-        if (colIndex === -1) return;
-
-        const uniqueValues = [...new Set(lines.slice(1)
-            .map(line => {
-                const cols = line.split(',').map(c => c.trim().replace(/['"]/g, ''));
-                return cols[colIndex];
-            })
-            .filter(v => v && v.length > 0)
-        )];
-
-        const pvDropdown = document.getElementById('pv_dropdown');
-        pvDropdown.innerHTML = '<option value="">-- Select Value --</option>';
-
-        uniqueValues.forEach(val => {
-            const opt = document.createElement('option');
-            opt.value = val;
-            opt.textContent = val;
-            pvDropdown.appendChild(opt);
-        });
-    };
-    reader.readAsText(file);
-});
 
 </script>
 
