@@ -36,6 +36,8 @@ Every day, AI models quietly shape human lives — deciding who gets a loan, who
 
 **Noxis changes that.**
 
+<div align="right"><a href="#️⃣-noxis--ai-fairness-auditor">↑ Back to top</a></div>
+
 ---
 
 ## 🔍 What is Noxis?
@@ -140,6 +142,8 @@ Fetch and audit **live CSVs directly from a raw GitHub or public API URL** — n
 | **Deployment** | Google Cloud Run (Docker container) |
 | **Visualization** | Chart.js, Matplotlib (dark mode SHAP plots) |
 
+<div align="right"><a href="#️⃣-noxis--ai-fairness-auditor">↑ Back to top</a></div>
+
 ---
 
 ## 🚀 Local Setup
@@ -189,6 +193,8 @@ python app.py
 ```
 
 Open **http://localhost:8080** 🎉
+
+<div align="right"><a href="#️⃣-noxis--ai-fairness-auditor">↑ Back to top</a></div>
 
 ---
 
@@ -240,6 +246,8 @@ gcloud run deploy noxis \
 ```
 
 Cloud Run gives you a live HTTPS URL. ✅
+
+<div align="right"><a href="#️⃣-noxis--ai-fairness-auditor">↑ Back to top</a></div>
 
 ---
 
@@ -293,15 +301,15 @@ Expected: Significant racial bias — the real dataset that sparked the global a
 │  BROWSER (index.html)                                           │
 │                                                                 │
 │  Upload Page ──► Loading ──► Split View                         │
-│                               ├── Chat Panel (Gemini stream)   │
-│                               └── Report Tabs                  │
-│                                    ├── Overview & Mitigation   │
-│                                    ├── Visualizations          │
-│                                    ├── Legal Hub               │
-│                                    ├── Red Teaming             │
-│                                    ├── Human Impact            │
-│                                    ├── Simulation Lab          │
-│                                    └── Audit Log               │
+│                               ├── Chat Panel (Gemini stream)    │
+│                               └── Report Tabs                   │
+│                                    ├── Overview & Mitigation    │
+│                                    ├── Visualizations           │
+│                                    ├── Legal Hub                │
+│                                    ├── Red Teaming              │
+│                                    ├── Human Impact             │
+│                                    ├── Simulation Lab           │
+│                                    └── Audit Log                │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ HTTP / Streaming responses
 ┌──────────────────────────────▼──────────────────────────────────┐
