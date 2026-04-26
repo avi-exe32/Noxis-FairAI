@@ -20,7 +20,7 @@
 
 <br/>
 
-**[▶️ Watch Demo Video](#demo) · [🚀 Run Locally](#1-clone-the-repo) · [☁️ Deploy to Cloud](#1-create-a-dockerfile-in-the-root) · [🧪 Test Datasets](#option-a--built-in-sample-files)**
+**[▶️ Watch Demo Video](YOUR_YOUTUBE_LINK) · [🌐 Live Demo](YOUR_WEBSITE_LINK) · [🚀 Run Locally](#1-clone-the-repo) · [🧪 Test Datasets](#option-a--built-in-sample-files)**
 
 <br/>
 
