@@ -3185,6 +3185,7 @@ async function runRedTeamAttack() {
             });
 
             const data = await res.json();
+            auditContext.red_team_data = data.html_payload;
             clearInterval(progInt);
             fill.style.width = '100%';
             percent.textContent = '100%';
@@ -3234,7 +3235,7 @@ async function runRedTeamAttack() {
                 body: JSON.stringify({ context: auditContext })
             });
             const data = await res.json();
-            
+            auditContext.human_impact_data = data.html_payload;
             clearInterval(progInt);
             fill.style.width = '100%';
             percent.textContent = '100%';
