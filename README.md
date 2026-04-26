@@ -1,6 +1,7 @@
+
 <div align="center">
 
-<img src="static/logo.png" alt="Noxis" width="300"/>
+<img width="1059" height="235" alt="Noxis" src="https://github.com/user-attachments/assets/a8b7d944-d467-4484-8285-2d7944f1201e" />
 
 #  Noxis — AI Fairness Auditor
 
