@@ -1634,6 +1634,7 @@
             <button class="tab-btn" onclick="switchTab('tab-human', this)">Human Impact</button>
             <button class="tab-btn" onclick="switchTab('tab-redteam', this)">Red Teaming</button>
             <button class="tab-btn" onclick="switchTab('tab-sandbox', this)">Simulation Lab</button>
+            <button class="tab-btn" onclick="switchTab('tab-api', this)">Developer API</button>
             <button class="tab-btn" onclick="switchTab('tab-history', this)">Audit Log</button>
         </div>
 
@@ -1978,7 +1979,7 @@
                 </div>
             </div>
         </div>
-   </div>
+     </div>
 
         <!-- TAB 3: AUDIT LOG -->
         <div id="tab-history" class="tab-pane">
@@ -1988,6 +1989,74 @@
                 </div>
             </div>
         </div>
+
+                    <div id="tab-api" class="tab-pane">
+                        <div class="section-label" style="color: var(--accent2); border-bottom-color: rgba(56,189,248,0.3);">Noxis Developer API (Beta)</div>
+                            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6;">
+                                Integrate automated fairness auditing directly into your CI/CD pipelines. Block biased models from being deployed to production automatically.
+                            </p>
+
+                            <div style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.3); border-left: 4px solid var(--warn); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 12px;">
+                                <div style="font-size: 20px;">🚧</div>
+                                <div>
+                                    <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--warn); font-weight: 700; margin-bottom: 4px; letter-spacing: 1px;">V2 ROADMAP CONCEPT</div>
+                                    <div style="font-size: 13px; color: #fb923c; line-height: 1.5; opacity: 0.9;">
+                                        This tab is an interactive mockup to demonstrate Noxis's enterprise vision. The actual backend routing for live CI/CD pipeline integration is slated for our next major release!
+                                    </div>
+                                </div>
+                            </div>
+
+                        <div class="card" style="padding: 24px; background: var(--surface2); margin-bottom: 24px; border: 1px solid var(--border);">
+                            <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--text); margin-bottom:12px; letter-spacing: 1px;">API KEY GENERATION</div>
+                            
+                            <div style="display: flex; gap: 12px; align-items: center; background: #090911; border: 1px solid var(--border); padding: 12px; border-radius: 10px;">
+                                <input type="password" id="fakeApiKey" value="nox_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" readonly style="flex: 1; background: transparent; border: none; color: var(--accent2); font-family: 'Space Mono', monospace; font-size: 14px; outline: none; letter-spacing: 1px;">
+                                <button class="add-chart-btn" id="genKeyBtn" onclick="generateFakeKey()" style="width: auto; padding: 8px 16px; margin: 0; background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.4); color: var(--accent2);">Generate Live Key</button>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                            
+                            <div class="code-block-container" style="margin-top: 0;">
+                                <div class="code-header">
+                                    <span class="code-filename">Terminal (cURL)</span>
+                                </div>
+                                <pre class="code-body" style="color: #a855f7;"><code>curl -X POST https://api.noxis.ai/v1/audit \
+            -H "Authorization: Bearer <span id="curlKeyText">$NOXIS_API_KEY</span>" \
+            -H "Content-Type: multipart/form-data" \
+            -F "dataset=@latest_training_data.csv" \
+            -F "model=@candidate_model.pkl" \
+            -F "target_label=approved" \
+            -F "sensitive_attr=race"</code></pre>
+                            </div>
+
+                            <div class="code-block-container" style="margin-top: 0;">
+                                <div class="code-header">
+                                    <span class="code-filename">Python (CI/CD Pipeline Check)</span>
+                                </div>
+                                <pre class="code-body" style="color: #38bdf8;"><code>import requests
+
+            def verify_model_fairness():
+                # 1. Send model to Noxis for audit
+                response = requests.post(
+                    "https://api.noxis.ai/v1/audit",
+                    headers={"Authorization": f"Bearer {API_KEY}"},
+                    files={"dataset": open("data.csv", "rb"), "model": open("model.pkl", "rb")},
+                    data={"sensitive_attr": "gender", "label_col": "hired"}
+                )
+                
+                audit = response.json()
+                
+                # 2. Block deployment if Disparate Impact is illegal
+                if audit['disparate_impact'] < 0.8:
+                    raise Exception("DEPLOYMENT BLOCKED: Model violates EEOC 4/5ths rule.")
+                    
+                print("Model passes fairness checks. Proceeding to production.")</code></pre>
+                            </div>
+
+                        </div>
+                    </div>
+
     </div>
 </div>
 
@@ -3320,6 +3389,45 @@ let ceoTicking = false;
             initCEOChart();
         }
     }; 
+
+function generateFakeKey() {
+        const btn = document.getElementById('genKeyBtn');
+        const input = document.getElementById('fakeApiKey');
+        const curlText = document.getElementById('curlKeyText');
+        
+        btn.textContent = "Generating...";
+        btn.style.opacity = "0.7";
+        
+        setTimeout(() => {
+            // Generate a random-looking hash
+            const hash = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const newKey = "nox_live_" + hash;
+            
+            // Update input to text so they can see it
+            input.type = "text";
+            input.value = newKey;
+            
+            // Update the code snippet dynamically
+            curlText.textContent = newKey;
+            curlText.style.color = "var(--good)";
+            
+            btn.textContent = "✓ Key Copied";
+            btn.style.background = "rgba(52,211,153,0.1)";
+            btn.style.borderColor = "rgba(52,211,153,0.4)";
+            btn.style.color = "var(--good)";
+            
+            // Actually copy to clipboard for maximum realism
+            navigator.clipboard.writeText(newKey);
+            
+            setTimeout(() => {
+                btn.textContent = "Generate New Key";
+                btn.style.background = "rgba(56,189,248,0.1)";
+                btn.style.borderColor = "rgba(56,189,248,0.4)";
+                btn.style.color = "var(--accent2)";
+            }, 3000);
+            
+        }, 800); // 800ms "fake thinking" delay
+    }
 
 </script>
 
