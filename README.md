@@ -22,7 +22,7 @@
 
 <br/>
 
-**[▶️ Watch Demo Video](YOUR_YOUTUBE_LINK) · [🌐 Live Demo](YOUR_WEBSITE_LINK) · [🚀 Run Locally](#1-clone-the-repo) · [🧪 Test Datasets](#option-a--built-in-sample-files)**
+**[▶️ Watch Demo Video](https://www.youtube.com/watch?v=JWOoQrmVJcE) · [🌐 Live Demo](https://noxis-278388103464.asia-south1.run.app) · [🚀 Run Locally](#1-clone-the-repo) · [🧪 Test Datasets](#option-a--built-in-sample-files)**
 
 <br/>
 
